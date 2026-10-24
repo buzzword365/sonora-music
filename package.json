@@ -1,0 +1,44 @@
+{
+  "name": "sonora-personal-music",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "idb": "^8.0.4",
+    "lucide-react": "^0.468.0",
+    "music-metadata": "^12.2.3",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "main": "electron/main.mjs",
+  "productName": "Sonora Music",
+  "description": "A private, full-length personal music player for macOS",
+  "author": "Sonora",
+  "scripts": {
+    "start": "electron .",
+    "check": "node --check electron/main.mjs && node --check electron/phone-server.mjs && node --check electron/lyrics.mjs && node --check electron/preload.cjs",
+    "pack:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir"
+  },
+  "devDependencies": {
+    "electron": "45.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.sonora.personalplayer",
+    "productName": "Sonora Music",
+    "files": [
+      "electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "identity": null
+    },
+    "asar": true,
+    "directories": {
+      "output": "release"
+    }
+  }
+}

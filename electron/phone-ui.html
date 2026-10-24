@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#121018"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Sonora">
+<title>Sonora — Your Music</title><link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/phone-icon-192.png"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{color-scheme:dark;--bg:#101014;--panel:#211b27;--edge:#3c3045;--ink:#f5edf9;--muted:#a69baa;--accent:#c9a6f6}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 65% -5%,#392343 0%,#151018 38%,#101014 67%);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;min-height:100dvh}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shell{max-width:650px;margin:0 auto;padding:30px 18px 170px}.logo{letter-spacing:-1.8px;font-size:32px;font-weight:900;color:#fff}.logo span{color:#b781ff}.pill{background:#2c2232;border:1px solid #48314f;border-radius:50px;color:#d9c4ec;padding:7px 12px;font-size:11px;letter-spacing:.3px}.head{display:flex;justify-content:space-between;align-items:center;gap:12px}.subtitle{font-size:13px;color:var(--muted);margin:0 0 22px}.tabs{display:flex;gap:8px;overflow:auto;padding:6px 0 18px;scrollbar-width:none}.tab{white-space:nowrap;border-radius:30px;background:#29232d;border:1px solid #42354b;color:#d4cbd8;padding:9px 15px;font-weight:650;font-size:12px}.tab.active{background:#e9d2fc;border-color:#e9d2fc;color:#1b1222}.search{display:block;width:100%;border:1px solid #5b4666;border-radius:12px;background:#251e2a;color:white;padding:13px 15px;margin-bottom:20px;outline:none}.search::placeholder{color:#998a9d}
+.kicker{color:#c29df0;letter-spacing:1.8px;font-size:10px;font-weight:800;margin:0 0 8px}.title{font-size:30px;letter-spacing:-1.5px;line-height:1.1;margin:0 0 10px}.hero{border-radius:17px;background:linear-gradient(135deg,#6f487c,#36223c 60%,#241b2b);padding:22px;margin-bottom:27px;overflow:hidden;position:relative}.hero h2{font-size:25px;letter-spacing:-.8px;line-height:1.14;margin:0 0 6px}.hero p{font-size:12px;color:#e0cee8;max-width:250px}.hero:after{content:'♪';position:absolute;right:4px;bottom:-75px;font-size:210px;line-height:1;opacity:.14;transform:rotate(-15deg)}.hero button{border:0;border-radius:99px;background:#f5edfa;color:#28182c;font-weight:800;padding:11px 17px;margin-top:8px}
+h3{font-size:18px;letter-spacing:-.45px;margin:24px 0 12px}p.muted{color:var(--muted);font-size:12px}.list{display:grid;gap:4px}.song{width:100%;background:transparent;border:0;border-radius:10px;color:#f8f0fa;text-align:left;padding:9px 7px;display:flex;align-items:center;gap:13px}.song:hover,.song.current{background:#302538}.art{width:49px;height:49px;flex:none;display:grid;place-items:center;border-radius:9px;background:linear-gradient(135deg,#985bad,#452756);font-size:22px;overflow:hidden}.art img{width:100%;height:100%;object-fit:cover}.details{flex:1;min-width:0}.details b,.details small{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.details b{font-size:13px}.details small{font-size:11px;color:var(--muted);margin-top:2px}.song .like{border:0;background:transparent;color:#bba6c5;font-size:22px;padding:8px}.song .like.liked{color:#df9cce}.mix-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.mix{min-height:126px;text-align:left;color:#f7effd;border:1px solid #77558a;border-radius:15px;padding:15px;display:flex;flex-direction:column;justify-content:space-between;background:linear-gradient(135deg,#6b4078,#2b1f34)}.mix:nth-child(2){background:linear-gradient(135deg,#4f4d89,#282236)}.mix:nth-child(3){background:linear-gradient(135deg,#76525a,#30252f)}.mix:nth-child(4){background:linear-gradient(135deg,#465e79,#202a37)}.mix b{font-size:18px}.mix small{font-size:11px;color:#e6d5ea;line-height:1.35}
+.playlist{padding:15px 16px;text-align:left;border:1px solid var(--edge);border-radius:12px;background:#221b28;color:#f6eefa;display:flex;justify-content:space-between;gap:15px;margin:8px 0;width:100%}.playlist b{font-size:14px}.playlist small{color:#b9abbf}.player{position:fixed;bottom:0;left:0;right:0;padding:12px max(15px,env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg,#2c2135,#160f1c);border-top:1px solid #675077;box-shadow:0 -16px 44px #0e0a15a0;z-index:10}.player-inner{max-width:650px;margin:auto}.now{display:flex;gap:10px;align-items:center;justify-content:space-between}.now .art{width:46px;height:46px}.now .details{max-width:45%}.control{background:#544060;border:1px solid #795d8c;color:#f5e7ff;border-radius:50%;width:38px;height:38px;display:grid;place-items:center;font-size:19px;font-weight:700}.control.main{background:#edd8ff;color:#29192e;border:0;width:44px;height:44px}.player-actions{display:flex;gap:9px;align-items:center}.timeline{display:flex;align-items:center;gap:9px;margin:11px 1px 0;font-size:10px;color:#bbadbf}.timeline input{flex:1;min-width:0;accent-color:#d6a7fe}.now-buttons{display:flex;gap:8px;align-items:center;margin-top:10px}.secondary{border:1px solid #695875;background:#2b2430;color:#dfceeb;border-radius:30px;padding:7px 11px;font-size:11px;font-weight:650}
+.toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);max-width:90vw;background:#382943;color:#fff;padding:12px 16px;border:1px solid #a080ad;border-radius:12px;box-shadow:0 12px 50px #000c;z-index:25;font-size:12px}.hidden{display:none!important}
+.lyrics-screen{position:fixed;z-index:20;inset:0;background:linear-gradient(150deg,#6b3f78,#341d43 63%,#170e1d);overflow:auto;padding:24px 25px 160px;overscroll-behavior:contain}.lyric-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:50px}.lyric-head button{color:#fff;background:#b99bcc33;border:1px solid #cfbbe555;border-radius:30px;padding:9px 13px}.lyric-line{font-size:clamp(24px,6.6vw,38px);font-weight:800;line-height:1.24;letter-spacing:-.6px;color:#c0a2cb;opacity:.65;margin:0 0 23px;transition:opacity .2s}.lyric-line.active{color:#fff;opacity:1}.lyrics-empty{font-size:16px;color:#e4ccec}
+@media(min-width:700px){.shell{padding-top:45px}.player{padding-bottom:15px}}@media(max-width:370px){.song .art{width:40px;height:40px}.now .details{max-width:34%}.player-actions{gap:5px}.control{width:34px;height:34px}}
+
+.game-card{background:linear-gradient(147deg,#473059,#211a2a);border:1px solid #6b4b80;border-radius:19px;padding:19px;margin:0 0 17px;box-shadow:0 10px 35px #0002}
+.game-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.game-status{font-size:11px;font-weight:800;letter-spacing:.4px;color:#cdb2e8}.game-status.playing{color:#96e6b6}
+.game-now{font-size:clamp(22px,6vw,32px);font-weight:900;line-height:1.15;letter-spacing:-.65px;margin:19px 0 3px}.game-artist{font-size:13px;color:#c9b6d1}
+.game-buttons{display:flex;align-items:center;justify-content:center;gap:18px;margin:20px 0}
+.game-buttons button{border-radius:50%;width:54px;height:54px;background:#4a3659;border:1px solid #7e6093;color:white;font-size:23px}
+.game-buttons button.primary{width:72px;height:72px;background:#ecd3ff;color:#27182e;font-weight:900;font-size:30px;border:none}
+.game-slider{width:100%;accent-color:#d8a4fe;cursor:pointer}.game-label{display:flex;justify-content:space-between;gap:12px;color:#e2d4e6;font-size:12px;font-weight:750;margin:15px 0 7px}
+.game-list{max-height:340px;overflow:auto;overscroll-behavior:contain;border:1px solid #42354d;border-radius:12px;background:#1b1820}
+.game-list button{display:flex;align-items:center;gap:12px;text-align:left;width:100%;background:transparent;color:#eee3f5;border:none;padding:12px 13px;border-bottom:1px solid #3a3041;font-size:12px}
+.game-list button:last-child{border-bottom:none}.game-list button.active{background:#423050;color:#f2daff}
+.game-list button small{display:block;color:#b4a0bd;margin-top:3px}.game-list button .game-queue-num{color:#ab87c2;font-weight:900;min-width:14px}
+.game-list button .game-reorder{margin-left:auto;color:#c9b1d5;font-weight:850;padding:7px;border:1px solid #665072;border-radius:8px}
+.game-mode-alert{background:#27212e;border-left:3px solid #b486df;padding:13px 14px;border-radius:7px;color:#cbbcd3;font-size:12px;line-height:1.6;margin:13px 0 24px}
+.game-chip-row{display:flex;gap:8px;overflow:auto;padding:0 0 12px}.game-chip{border-radius:30px;background:#302539;border:1px solid #6b4c77;color:#e7d9ec;padding:9px 13px;font-size:12px;white-space:nowrap}
+.game-subhead{font-size:14px;color:#e9dcf1;font-weight:850;margin:23px 0 10px}
+</style></head>
+<body><div class="shell">
+<header class="head"><div class="logo">sonora<span>.</span></div><button class="pill" id="privacy" aria-label="Toggle private listening">◉ Private session: OFF</button></header>
+<p class="subtitle">Your music from your Mac · Same Wi‑Fi · No ads</p>
+<nav class="tabs" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="songs">Songs</button><button class="tab" data-tab="mixes">Mixes</button><button class="tab" data-tab="playlists">Playlists</button><button class="tab" data-tab="liked">Liked</button><button class="tab" data-tab="gaming">🎮 Gaming Remote</button></nav>
+<input class="search" id="search" type="search" placeholder="Search your songs, artists and albums">
+<section id="content" aria-live="polite"><h3>Connecting to your music…</h3></section>
+</div>
+<section class="player"><div class="player-inner"><div class="now">
+<div class="art" id="now-art">♫</div><div class="details"><b id="now-title">Nothing playing</b><small id="now-artist">Choose a song</small></div>
+<div class="player-actions"><button class="control" id="prev" aria-label="Previous">‹‹</button><button class="control main" id="toggle" aria-label="Play or pause">▶</button><button class="control" id="next" aria-label="Next">››</button></div>
+</div><div class="timeline"><span id="elapsed">0:00</span><input type="range" id="progress" min="0" max="100" value="0" aria-label="Playback progress"><span id="total">0:00</span></div>
+<div class="now-buttons"><button class="secondary" id="lyrics-button">⌃ Lyrics</button><button class="secondary" id="mac-button">↗ Play on Mac</button><button class="secondary" id="take-over">↙ Continue here</button><button class="secondary" id="download">↓ Save file</button></div></div></section>
+<div class="lyrics-screen hidden" id="lyrics-screen"><div class="lyric-head"><b>LIVE LYRICS</b><button id="close-lyrics">⌄ Close</button></div><div id="lyrics-lines"><p class="lyrics-empty">Loading lyrics…</p></div></div>
+<div class="toast hidden" id="toast"></div>
+<audio id="audio" preload="metadata"></audio>
+<script>
+const state={tracks:[],playlists:[],mixes:[],playingOnMac:null,queue:[],current:null,privateMode:false,activeTab:'home',filter:'',lyrics:[],lyricsOpen:false,source:'phone'};
+const byId=id=>state.tracks.find(t=>t.id===id);
+const $=id=>document.getElementById(id);
+const audio=$('audio');
+const escapeHtml=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>Number.isFinite(s)?Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0'):'0:00';
+const toast=msg=>{$('toast').textContent=msg;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),3400)};
+const request=async path=>{
+ const res=await fetch(path,{cache:'no-store'});
+ if(res.status===401){location.reload();throw Error('Pairing expired');}
+ if(!res.ok)throw Error('Request failed: '+res.status);
+ return res.json();
+};
+const command=async(action,id,extra={})=>{
+ const res=await fetch('/api/command',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,id,...extra})});
+ if(!res.ok)throw Error(res.status===503?'Open Sonora on your Mac to control its music.':res.status===401?'Pair with your Mac again.':'Mac command unavailable');return res.json();
+};
+const cover=t=>t?.cover?'<img loading="lazy" src="/api/cover/'+t.nativeId+'" alt="">':'♫';
+
+const gameMarkup=()=>{
+ const p=state.playingOnMac||{},song=byId(p.id),queue=(p.queue||[]).filter(byId);
+ const status=p.isPlaying?'● PLAYING ON MAC':'○ PAUSED / READY';
+ const label=p.isPlaying?'Ⅱ':'▶';
+ const volume=typeof p.volume==='number'?p.volume:.76;
+ const pos=Number.isFinite(p.position)?p.position:0,duration=Number.isFinite(p.duration)?p.duration:0;
+ return '<p class="kicker">SONORA · PS5 GAMING MODE</p><h2 class="title">Your iPhone is the remote.</h2>'
+   +'<div class="game-mode-alert">🎮 Game audio stays on the PS5. Sonora music plays from your <b>Mac</b>. Connect both audio sources to a compatible dual-source headset or a mixer. This cannot control the PS5 USB music player.</div>'
+   +'<div class="game-card"><div class="game-top"><span class="game-status '+(p.isPlaying?'playing':'')+'" id="game-status">'+status+'</span><span class="pill">Mac output</span></div>'
+   +'<div class="game-now" id="game-track">'+escapeHtml(song?.title||'Choose a song below')+'</div><div class="game-artist" id="game-artist">'+escapeHtml(song?.artist||'Music plays on your Mac, not this phone')+'</div>'
+   +'<div class="game-buttons"><button data-game="previous" aria-label="Previous song on Mac">‹‹</button><button class="primary" data-game="toggle" id="game-toggle" aria-label="Toggle Mac playback">'+label+'</button><button data-game="next" aria-label="Next song on Mac">››</button></div>'
+   +'<div class="game-label"><span>Music position</span><span id="game-time">'+fmt(pos)+' / '+fmt(duration)+'</span></div><input class="game-slider" id="game-seek" type="range" min="0" max="'+Math.max(1,duration)+'" step="1" value="'+Math.min(pos,duration)+'" aria-label="Seek Mac playback">'
+   +'<div class="game-label"><span>Mac music volume</span><span id="game-volume-text">'+(p.muted?'MUTED':Math.round(volume*100)+'%')+'</span></div><input class="game-slider" id="game-volume" type="range" min="0" max="100" step="1" value="'+Math.round(volume*100)+'" aria-label="Mac music volume"><div style="display:flex;gap:9px;margin-top:10px"><button class="secondary" data-game="mute" id="game-mute">'+(p.muted?'Unmute':'Mute')+'</button><button class="secondary" data-game="refresh">Refresh status</button></div></div>'
+   +'<div class="game-subhead">Start a playlist on your Mac</div><div class="game-chip-row">'+state.playlists.filter(pl=>(pl.trackIds||[]).some(byId)).map(pl=>'<button class="game-chip" data-game-playlist="'+escapeHtml(pl.id)+'">'+escapeHtml(pl.name)+'</button>').join('')+'</div>'
+   +'<div class="game-subhead">Up next on the Mac · '+queue.length+' tracks</div><div class="game-list" id="game-queue">'+(queue.length?queue.slice(0,100).map((id,i)=>{const t=byId(id);return '<button data-game-song="'+id+'" class="'+(id===p.id?'active':'')+'"><span class="game-queue-num">'+(i+1)+'</span><span style="min-width:0;flex:1"><b>'+escapeHtml(t.title)+'</b><small>'+escapeHtml(t.artist)+'</small></span><span class="game-reorder" data-game-up="'+id+'">↑</span></button>'}).join(''):'<div class="game-mode-alert">Choose a playlist or select a song below to set up your queue.</div>')+'</div>'
+   +'<div class="game-subhead">Play any song on your Mac</div><div class="game-list">'+state.tracks.slice(0,150).map(t=>'<button data-game-song="'+t.id+'"><span>♫</span><span style="min-width:0"><b>'+escapeHtml(t.title)+'</b><small>'+escapeHtml(t.artist)+'</small></span></button>').join('')+'</div>'
+   +'<p class="muted" style="margin-top:19px">Keep your Mac awake, Sonora open, and your phone on the same trusted Wi-Fi. The Mac output device is selected in macOS System Settings → Sound → Output. Gaming mode does not change your PS5 audio routing.</p>';
+};
+const updateGamingStatus=()=>{
+ if(state.activeTab!=='gaming')return;
+ const p=state.playingOnMac||{},song=byId(p.id);
+ const text=(id,value)=>{const n=$(id);if(n)n.textContent=value};
+ text('game-status',p.isPlaying?'● PLAYING ON MAC':'○ PAUSED / READY');
+ if($('game-status'))$('game-status').classList.toggle('playing',!!p.isPlaying);
+ text('game-track',song?.title||'Choose a song below');
+ text('game-artist',song?.artist||'Music plays on your Mac, not this phone');
+ text('game-toggle',p.isPlaying?'Ⅱ':'▶');
+ text('game-time',fmt(p.position||0)+' / '+fmt(p.duration||0));
+ text('game-volume-text',p.muted?'MUTED':Math.round((p.volume??.76)*100)+'%');
+ text('game-mute',p.muted?'Unmute':'Mute');
+ if($('game-volume')&&document.activeElement!==$('game-volume'))$('game-volume').value=String(Math.round((p.volume??.76)*100));
+ if($('game-seek')&&document.activeElement!==$('game-seek')){
+   $('game-seek').max=String(Math.max(1,p.duration||1));$('game-seek').value=String(Math.min(p.position||0,p.duration||1));
+ }
+};
+let gamePollBusy=false;
+async function syncGaming(){
+ if(gamePollBusy)return;
+ gamePollBusy=true;
+ try{
+  const data=await request('/api/library');
+  const oldQueue=(state.playingOnMac?.queue||[]).join('|');
+  const oldLists=state.playlists.map(x=>x.id+':'+x.trackIds.length).join('|');
+  state.tracks=data.tracks||[];state.playlists=data.playlists||[];state.mixes=data.mixes||[];
+  state.playingOnMac=data.playback||null;state.privateMode=!!data.privateMode;
+  const newQueue=(state.playingOnMac?.queue||[]).join('|');
+  const newLists=state.playlists.map(x=>x.id+':'+x.trackIds.length).join('|');
+  if(state.activeTab==='gaming' && (oldQueue!==newQueue||oldLists!==newLists))render();
+  else updateGamingStatus();
+ }catch(e){toast('Mac connection interrupted. Check Sonora and Wi-Fi.');}
+ finally{gamePollBusy=false;}
+}
+async function runGame(action,extra={}){
+ try{await command(action,undefined,extra);setTimeout(()=>void syncGaming(),350);}
+ catch(e){toast(e.message);}
+}
+
+const songRow=t=>'<div class="song '+(state.current===t.id?'current':'')+'"><button class="song" data-play="'+t.id+'" style="flex:1;min-width:0;padding:0"><span class="art">'+cover(t)+'</span><span class="details"><b>'+escapeHtml(t.title)+'</b><small>'+escapeHtml(t.artist)+'</small></span></button><button class="like '+(t.liked?'liked':'')+'" data-like="'+t.id+'" aria-label="Like '+escapeHtml(t.title)+'">'+(t.liked?'♥':'♡')+'</button></div>';
+function render(){
+ const term=state.filter.toLowerCase().trim();
+ const filtered=state.tracks.filter(t=>(t.title+' '+t.artist+' '+t.album).toLowerCase().includes(term));
+ document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.activeTab));
+ let html='';
+ if(state.activeTab==='home'){
+   html='<div class="hero"><div class="kicker">YOUR SOUNDTRACK, ANYWHERE AT HOME</div><h2>Your music.<br>Your rules.</h2><p>Listen on your phone or transfer playback to the Mac.</p><button data-open="mixes">Explore your mixes →</button></div>';
+   html+='<div class="kicker">MADE FOR YOU</div><div class="mix-grid">'+state.mixes.slice(0,4).map(m=>'<button class="mix" data-mix="'+m.id+'"><span>✦</span><b>'+escapeHtml(m.name)+'</b><small>'+escapeHtml(m.subtitle)+'</small></button>').join('')+'</div><h3>Recently in your library</h3>';
+   html+=filtered.slice(0,18).map(songRow).join('');
+ }else if(state.activeTab==='gaming'){html=gameMarkup();
+ }else if(state.activeTab==='songs'||state.activeTab==='liked'){
+   const list=state.activeTab==='liked'?filtered.filter(t=>t.liked):filtered;
+   html='<h3>'+(state.activeTab==='liked'?'Liked songs':'Your songs')+' <small style="color:#ab9fb4">'+list.length+'</small></h3>'+list.map(songRow).join('');
+ }else if(state.activeTab==='mixes'){
+   html='<h3>Made for you</h3><p class="muted">Mixes are generated from the tracks on your Mac. No external algorithm or ads.</p><div class="mix-grid">'+state.mixes.map(m=>'<button class="mix" data-mix="'+m.id+'"><span>✦</span><b>'+escapeHtml(m.name)+'</b><small>'+escapeHtml(m.subtitle)+'</small></button>').join('')+'</div>';
+ }else{
+   html='<h3>Your playlists</h3>'+state.playlists.map(p=>'<button class="playlist" data-playlist="'+escapeHtml(p.id)+'"><b>'+escapeHtml(p.name)+'</b><small>'+p.trackIds.length+' songs →</small></button>').join('');
+ }
+ $('content').innerHTML=html||'<h3>No songs found</h3><p class="muted">Add songs to your Mac library and they will appear here.</p>';
+ $('privacy').textContent='◉ Private session: '+(state.privateMode?'ON':'OFF');
+}
+function songList(ids){return ids.filter(byId);}
+function play(id,ids){
+ const t=byId(id);if(!t)return;
+ if(ids?.length)state.queue=songList(ids);
+ else if(!state.queue.length)state.queue=state.tracks.map(t=>t.id);
+ state.current=id;state.source='phone';
+ audio.src='/api/audio/'+t.nativeId;audio.load();
+ const p=audio.play();if(p)p.catch(()=>toast('Tap Play to allow audio on this device.'));
+ command('pause-mac').catch(()=>{});
+ if(!state.privateMode)command('played',id).catch(()=>{});
+ updateNow();loadLyrics();render();
+}
+function next(direction=1){
+ const i=state.queue.indexOf(state.current),at=i+direction;
+ if(at<0||at>=state.queue.length){audio.pause();updateNow();return;}
+ play(state.queue[at]);
+}
+function updateNow(){
+ const t=byId(state.current);
+ $('now-title').textContent=t?.title||'Nothing playing';$('now-artist').textContent=t?.artist||'Choose a song';
+ $('now-art').innerHTML=cover(t);
+ $('toggle').textContent=audio.paused?'▶':'Ⅱ';
+ $('elapsed').textContent=fmt(audio.currentTime);$('total').textContent=fmt(audio.duration||t?.duration||0);
+ $('progress').max=Math.max(1,audio.duration||t?.duration||1);
+ $('progress').value=audio.currentTime||0;
+ if(state.lyricsOpen)updateLyrics();
+}
+async function loadLyrics(){
+ const t=byId(state.current);
+ state.lyrics=[];
+ if(t)try{state.lyrics=(await request('/api/lyrics/'+t.nativeId)).lines||[]}catch{}
+ updateLyrics();
+}
+function updateLyrics(){
+ if(!state.lyricsOpen)return;
+ const lines=state.lyrics;
+ const pos=audio.currentTime||0;
+ const active=lines.reduce((i,line,j)=>line.time<=pos?j:i,-1);
+ $('lyrics-lines').innerHTML=lines.length?lines.map((l,i)=>'<p class="lyric-line '+(i===active?'active':'')+'" data-line="'+i+'">'+escapeHtml(l.text)+'</p>').join(''):'<p class="lyrics-empty">No lyrics file found for this song. Add an .lrc file with the same filename next to its music file on the Mac.</p>';
+ const line=$('lyrics-lines').querySelector('.active');
+ if(line && Math.abs(active-(state.lastLyricsIndex??-1))>0){line.scrollIntoView({behavior:'smooth',block:'center'});}
+ state.lastLyricsIndex=active;
+}
+async function refresh(){
+ const data=await request('/api/library');
+ state.tracks=data.tracks||[];state.playlists=data.playlists||[];state.mixes=data.mixes||[];
+ state.playingOnMac=data.playback||null;state.privateMode=Boolean(data.privateMode);
+ render();updateNow();
+}
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-play],[data-like],[data-tab],[data-mix],[data-playlist],[data-open],[data-game],[data-game-playlist],[data-game-song],[data-game-up]');
+ if(!b)return;
+ if(b.dataset.gameUp){
+  event.preventDefault();event.stopPropagation();
+  const ids=(state.playingOnMac?.queue||[]).slice(),i=ids.indexOf(b.dataset.gameUp);
+  if(i>0){[ids[i-1],ids[i]]=[ids[i],ids[i-1]];await runGame('queue-mac',{ids});}
+  return;
+ }
+ if(b.dataset.gameSong){
+  const id=b.dataset.gameSong;
+  audio.pause();
+  const q=state.playingOnMac?.queue||[];
+  await runGame('play-on-mac',{id,ids:q.includes(id)?q:state.tracks.map(t=>t.id)});
+  return;
+ }
+ if(b.dataset.gamePlaylist){
+  const pl=state.playlists.find(p=>p.id===b.dataset.gamePlaylist);
+  const ids=(pl?.trackIds||[]).filter(byId);
+  if(!ids.length){toast('No playable tracks in this playlist.');return;}
+  audio.pause();await runGame('play-on-mac',{id:ids[0],ids});return;
+ }
+ if(b.dataset.game){
+  const action=b.dataset.game,p=state.playingOnMac||{};
+  if(action==='refresh'){await syncGaming();return;}
+  if(action==='toggle'){
+   const shouldPause=!!p.isPlaying;
+   state.playingOnMac={...p,isPlaying:!shouldPause};updateGamingStatus();
+   await runGame(shouldPause?'pause-mac':'resume-mac');return;
+  }
+  if(action==='mute'){
+   const muted=!p.muted;
+   state.playingOnMac={...p,muted};updateGamingStatus();
+   await runGame('mute-mac',{muted});return;
+  }
+  if(action==='next'||action==='previous'){await runGame(action+'-mac');return;}
+ }
+ if(b.dataset.tab){state.activeTab=b.dataset.tab;if(state.activeTab==='gaming')audio.pause();render();if(state.activeTab==='gaming')void syncGaming();return;}
+ if(b.dataset.open){state.activeTab=b.dataset.open;render();return;}
+ if(b.dataset.play){play(b.dataset.play);return;}
+ if(b.dataset.like){
+   try{await command('like',b.dataset.like);await refresh()}catch(e){toast(e.message)}
+   return;
+ }
+ if(b.dataset.mix){
+   const m=state.mixes.find(x=>x.id===b.dataset.mix);
+   if(m?.ids?.length)play(m.ids[0],m.ids.filter(byId));
+   return;
+ }
+ if(b.dataset.playlist){
+   const p=state.playlists.find(x=>x.id===b.dataset.playlist);
+   const ids=(p?.trackIds||[]).filter(byId);
+   if(ids.length)play(ids[0],ids);else toast('This playlist has no available tracks.');
+ }
+});
+$('search').addEventListener('input',e=>{state.filter=e.target.value;render()});
+document.addEventListener('change',e=>{
+ if(e.target.id==='game-seek')void runGame('seek-mac',{position:Number(e.target.value)});
+ if(e.target.id==='game-volume')void runGame('volume-mac',{volume:Number(e.target.value)/100});
+});
+document.addEventListener('input',e=>{
+ if(e.target.id==='game-volume')$('game-volume-text').textContent=e.target.value+'%';
+ if(e.target.id==='game-seek')$('game-time').textContent=fmt(Number(e.target.value))+' / '+fmt(state.playingOnMac?.duration||0);
+});
+
+$('prev').onclick=()=>next(-1);$('next').onclick=()=>next(1);
+$('toggle').onclick=async()=>{
+ if(!state.current){
+   if(state.tracks.length)play(state.tracks[0].id);
+   return;
+ }
+ if(audio.paused){try{await audio.play()}catch{toast('Playback could not start.')}}
+ else audio.pause();
+ updateNow();
+};
+$('progress').oninput=e=>{audio.currentTime=Number(e.target.value);updateNow()};
+audio.addEventListener('timeupdate',updateNow);
+audio.addEventListener('play',updateNow);
+audio.addEventListener('pause',updateNow);
+audio.addEventListener('ended',()=>next(1));
+$('mac-button').onclick=async()=>{
+ if(!state.current)return toast('Choose a song first.');
+ try{await command('play-on-mac',state.current,{position:audio.currentTime});audio.pause();toast('Playback sent to your Mac.')}catch(e){toast(e.message)}
+};
+$('take-over').onclick=async()=>{
+ await refresh().catch(()=>{});
+ const p=state.playingOnMac;
+ if(!p?.id||!byId(p.id))return toast('Play a song on your Mac first.');
+ play(p.id);
+ const seek=()=>{if(Number.isFinite(p.position)&&p.position>0)audio.currentTime=Math.min(p.position,audio.duration||p.position);};
+ if(audio.readyState>=1)seek();else audio.addEventListener('loadedmetadata',seek,{once:true});
+ toast('Music moved to your phone.');
+};
+$('download').onclick=()=>{
+ const t=byId(state.current);if(!t)return toast('Choose a song first.');
+ const a=document.createElement('a');a.href='/api/download/'+t.nativeId;a.download=t.title;a.click();
+ toast('Song download requested. Save it in Files for offline listening.');
+};
+$('privacy').onclick=async()=>{
+ state.privateMode=!state.privateMode;render();
+ try{await command('private',null,{value:state.privateMode})}catch{}
+ toast(state.privateMode?'Private session: listening will not affect your Mac history.':'Private session ended.');
+};
+$('lyrics-button').onclick=()=>{state.lyricsOpen=true;$('lyrics-screen').classList.remove('hidden');updateLyrics()};
+$('close-lyrics').onclick=()=>{state.lyricsOpen=false;$('lyrics-screen').classList.add('hidden')};
+let touchY=0;
+document.addEventListener('touchstart',e=>{touchY=e.touches?.[0]?.clientY||0},{passive:true});
+document.addEventListener('touchend',e=>{
+ const end=e.changedTouches?.[0]?.clientY||0,delta=end-touchY;
+ if(delta< -90 && touchY>innerHeight*.65 && state.current){state.lyricsOpen=true;$('lyrics-screen').classList.remove('hidden');updateLyrics();}
+ if(delta>100 && state.lyricsOpen){state.lyricsOpen=false;$('lyrics-screen').classList.add('hidden');}
+},{passive:true});
+let backgroundTicks=0;
+setInterval(()=>{
+ if(document.hidden)return;
+ if(state.activeTab==='gaming')void syncGaming();
+ else if((++backgroundTicks)%7===0)void refresh().catch(()=>{});
+},2000);
+refresh().catch(err=>{$('content').innerHTML='<h3>Connection unavailable</h3><p class="muted">Keep your Mac on and Sonora open, then reconnect to the same Wi‑Fi.</p>';toast(err.message)});
+</script></body></html>

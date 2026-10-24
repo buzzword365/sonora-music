@@ -1,0 +1,19 @@
+name: Check macOS build
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run pack:mac
+      - name: Check app output
+        run: test -x "release/mac-arm64/Sonora Music.app/Contents/MacOS/Sonora Music" || test -x "release/mac/Sonora Music.app/Contents/MacOS/Sonora Music"
