@@ -1,4 +1,4 @@
-name: Check macOS build
+name: Build and verify Sonora
 on:
   push:
     branches: [main]
@@ -14,6 +14,8 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+      - run: npm run build
+      - run: npm run test:palette
       - run: npm run pack:mac
-      - name: Check app output
-        run: test -x "release/mac-arm64/Sonora Music.app/Contents/MacOS/Sonora Music" || test -x "release/mac/Sonora Music.app/Contents/MacOS/Sonora Music"
+      - name: Verify packaged macOS application
+        run: test -x "release/mac-arm64/Sonora Music.app/Contents/MacOS/Sonora Music"

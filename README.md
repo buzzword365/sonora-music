@@ -1,59 +1,70 @@
 # Sonora Music
 
-A macOS music player for your own local audio collection, with an expressive desktop interface, smart library scanning, media-key controls, and an optional phone companion.
+An independent macOS music player for your own local music collection, featuring dynamic album-art colour themes, a light/dark appearance studio, music-library management, media controls, and an optional local-network phone companion.
 
-**Public-source edition.** This repository was reconstructed from the installed Sonora desktop application. Electron's main process, preload bridge, LAN server, and phone UI are provided as editable source. The React/Vite renderer is included as a **precompiled distribution**, because the original development source (JSX/TSX) was not present in the app package. This isn't a complete React source release.
+**Version 0.2.0 — More colourful Light mode (28 October 2026)**
 
-## Features
+## What's new
 
-- Scans selected folders for your own MP3, AAC, M4A, FLAC, WAV, OGG and other supported audio files.
-- Library, queue, playlists, metadata, covers, player controls and keyboard media shortcuts.
-- Reads available lyrics from supported local music metadata.
-- Optional phone interface on the same LAN, using a QR pairing link.
-- Electron macOS desktop application.
+Sonora extracts a palette from your current song's embedded cover artwork and applies it throughout the app, including the sidebar, background, player, settings, and queue.
 
-**No music, downloaded songs, personal playlists, listening history, or private music library data are included.** Sonora is intended for files you have the rights to use.
+In **Settings → Appearance** you can choose:
 
-## Getting started
+- **Automatic** — let the artwork decide whether its theme is light or dark.
+- **Light** — use vibrant, coordinated pastel album colours, with noticeably different shades for the background, sidebar, cards, controls, and player. Black covers now take their accent from the illustration instead of accidentally picking a near-black pixel's hue.
+- **Dark** — use deeper, artwork-tinted surfaces with lighter matching controls.
 
-Requires macOS, Node.js and npm. Clone this repository and run:
+Switches animate smoothly (650 ms); the macOS reduced-motion setting is respected. Your selection is saved between launches. Missing or monochrome artwork has an accessible fallback. All colour analysis happens **on the device**.
 
-    git clone https://github.com/buzzword365/sonora-music.git
-    cd sonora-music
-    npm install
-    npm start
+### Other features
 
-To compile an unpackaged desktop app directory, run:
+- Local-folder library scanning for MP3, M4A/AAC, WAV, FLAC, OGG and other supported formats; music stays in its original folder.
+- Search, favourites, playlists, queue reordering and metadata edits.
+- Play/pause, skip, keyboard and native macOS media controls.
+- Equaliser presets, adjustable crossfade and a lyrics interface when available.
+- Optional phone companion over your local Wi-Fi, including PS5 Gaming Remote controls for music played on the Mac (not PS5 music playback).
+- No commercial streaming catalogue or music downloads.
 
-    npm run pack:mac
+## Install and run
 
-The app is not notarized or signed for distribution. You may need to build and run it locally.
+The app targets Apple Silicon macOS and is **unsigned and not notarised**. Download the packaged app from [GitHub Releases](https://github.com/buzzword365/sonora-music/releases), unzip it and open **Sonora Music.app**. macOS may require a manual approval in Privacy & Security.
 
-## Project layout
+Back up your previous app before replacing it. Sonora stores its library, playlists and settings in your user's application-data directory rather than inside the app bundle. Keep your original music files in place.
 
-| Directory | Contents |
+## Build from source
+
+The editable **React + TypeScript source is included** in this repository (unlike the initial public release).
+
+Prerequisites: Node.js 24+, npm, macOS and the usual Apple build tools.
+
+```sh
+git clone https://github.com/buzzword365/sonora-music.git
+cd sonora-music
+npm ci
+npm run dev             # Vite UI development server
+npm run build           # Type-check and compile the renderer
+npm run check           # Check native Electron scripts
+npm run test:palette    # Colour and accessibility regression tests
+npm run pack:mac        # Package the macOS app
+```
+
+Run `npm start` to open the built Electron desktop app, or `npm run desktop:dev` alongside `npm run dev` to work on the UI. An optional isolated-profile Electron UI test can be run with `npm run test:e2e`; it uses synthetic fixture tracks and tests the theme transitions and persistence.
+
+## Source layout
+
+| Path | Role |
 |---|---|
-| electron/main.mjs | Desktop lifecycle, local library, media protocols and playback bridge |
-| electron/preload.cjs | Isolated renderer bridge |
-| electron/phone-server.mjs | Local network companion and device pairing |
-| electron/phone-ui.html | Companion web UI |
-| electron/lyrics.mjs | Lyrics extracted from local files |
-| dist/ | Built renderer JavaScript, CSS and static assets |
+| `src/artworkTheme.ts` | Album-art sampling, colour clustering, light/dark palettes and contrast adjustment |
+| `src/artwork-theme.css` | Component colours, transitions and illustrated appearance selector |
+| `src/App.tsx` | App interface, settings and playback |
+| `src/store.ts` | On-device music metadata and preferences |
+| `src/audioMixer.ts` | Audio mixing, equaliser and crossfading |
+| `electron/` | Native desktop host, secure media access, local phone companion |
+| `tests/` | Pure palette tests and isolated Electron UI regression |
+| `dist/` | Precompiled renderer for convenience |
 
-The npm packages used by the app are declared in package.json. Dependency folders and app bundles are intentionally not checked in.
+## Privacy and distribution
 
-## Privacy and security
+No personal tracks, album-cover collections, listening history, playlists, account tokens, music-folder indexes, or runtime phone pairing credentials are checked in. The phone companion uses your local network and should only be paired on a network you trust; it is not a remote internet music service. Source files are editable under the repository's MIT licence, subject to third-party notices in [THIRD_PARTY.md](THIRD_PARTY.md).
 
-- Scanned music folders and library indexes are stored locally at runtime, not in the repository.
-- Phone pairing credentials are generated when you run the app and are saved in your computer's application data.
-- **The phone server may listen on your local network.** Pair only on a network you trust; don't publicly share the QR code or pairing URL.
-- No cloud account, music-streaming password, API token, user email, or personal file path is present in this source release.
-- Other than optional connectivity features, the player's core library and playback are local.
-
-The app is a personal project, not an official Apple Music or Spotify client. No copyrighted music catalogue or DRM credentials are distributed.
-
-## Attribution and license
-
-MIT for the original application code. Third-party libraries and components retain their separate copyrights and license terms; see THIRD_PARTY.md.
-
-**Frontend note:** the distribution includes Vite-built React assets rather than the editable React project source.
+Sonora is an independent personal project, not an official Apple Music or Spotify application.

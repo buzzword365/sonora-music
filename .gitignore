@@ -34,3 +34,10 @@ playlists/
 
 /dist/mac-*/
 /dist/win-*/
+
+# Source-build and automated-test byproducts
+*.tsbuildinfo
+tests/*-profile/
+tests/palette-test-build.cjs
+tests/*.png
+tests/*.webm

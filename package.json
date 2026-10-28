@@ -1,8 +1,21 @@
 {
   "name": "sonora-personal-music",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "desktop:dev": "SONORA_DEV_SERVER=http://127.0.0.1:5173 electron .",
+    "desktop": "npm run build && electron .",
+    "app:mac": "npm run build && electron-builder --mac dir --arm64",
+    "start": "electron .",
+    "check": "node --check electron/main.mjs && node --check electron/phone-server.mjs && node --check electron/lyrics.mjs && node --check electron/preload.cjs",
+    "test:palette": "node tests/palette-regression.mjs",
+    "test:e2e": "node tests/adaptive-theme-e2e.mjs",
+    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64"
+  },
   "dependencies": {
     "idb": "^8.0.4",
     "lucide-react": "^0.468.0",
@@ -11,34 +24,42 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.0",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0",
+    "playwright": "^1.64.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.0"
+  },
   "main": "electron/main.mjs",
   "productName": "Sonora Music",
-  "description": "A private, full-length personal music player for macOS",
-  "author": "Sonora",
-  "scripts": {
-    "start": "electron .",
-    "check": "node --check electron/main.mjs && node --check electron/phone-server.mjs && node --check electron/lyrics.mjs && node --check electron/preload.cjs",
-    "pack:mac": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir"
-  },
-  "devDependencies": {
-    "electron": "45.0.0",
-    "electron-builder": "^26.18.0"
-  },
   "build": {
     "appId": "com.sonora.personalplayer",
     "productName": "Sonora Music",
-    "files": [
-      "electron/**/*",
-      "dist/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "category": "public.app-category.music",
-      "identity": null
-    },
-    "asar": true,
     "directories": {
       "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*",
+      "!tests/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dir"
+      ],
+      "category": "public.app-category.music",
+      "identity": null,
+      "hardenedRuntime": false,
+      "icon": "build/icon.icns"
     }
-  }
+  },
+  "description": "A private, full-length personal music player for macOS",
+  "author": "Sonora"
 }
