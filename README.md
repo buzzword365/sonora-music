@@ -4,6 +4,18 @@ An independent macOS music player for your own local music collection, featuring
 
 **Version 0.3.0 — Better playlists and library search (29 October 2026)**
 
+
+## Your album art, your atmosphere
+
+Sonora automatically samples the **colours in the current song's album artwork** and carries a coordinated palette across the interface — including the background, sidebar, highlighted controls, playlist cards and music player. The colours change as the song changes, creating a different listening space for every cover.
+
+| Blue tones | Golden tones | Rose tones |
+|:---:|:---:|:---:|
+| ![Sonora interface in an album-inspired blue theme, with matching sidebar, controls and player](docs/screenshots/album-theme-blue.png) | ![Sonora interface in an album-inspired yellow theme, with warm gold controls and player](docs/screenshots/album-theme-yellow.webp) | ![Sonora interface in an album-inspired pink theme, with rose-tinted background and player](docs/screenshots/album-theme-pink.webp) |
+
+*Three songs, three colour palettes — all generated from their album covers, not preset theme colours.* Choose **Automatic**, **Light** or **Dark** in **Settings → Appearance** to control how those artwork colours are expressed. Palette extraction happens locally on your Mac.
+
+
 ## What's new in v0.3.0
 
 Create playlists directly from songs you have **already imported**: no need to import audio files again. Search by song, artist or album; select all matches, select individual songs, or drag over consecutive rows to select or deselect a range. Search results show compact embedded album-art thumbnails alongside track details, with a fallback icon when artwork is missing.
