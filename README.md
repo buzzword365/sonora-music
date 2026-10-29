@@ -11,7 +11,7 @@ Sonora automatically samples the **colours in the current song's album artwork**
 
 | Blue tones | Golden tones | Rose tones |
 |:---:|:---:|:---:|
-| ![Sonora interface in an album-inspired blue theme, with matching sidebar, controls and player](docs/screenshots/album-theme-blue.png) | ![Sonora interface in an album-inspired yellow theme, with warm gold controls and player](docs/screenshots/album-theme-yellow.webp) | ![Sonora interface in an album-inspired pink theme, with rose-tinted background and player](docs/screenshots/album-theme-pink.webp) |
+| <img src="docs/screenshots/album-theme-blue.png" width="320" alt="Blue album artwork theme across Sonora's player and controls" /> | <img src="docs/screenshots/album-theme-yellow.webp" width="320" alt="Golden album artwork theme across Sonora's player and controls" /> | <img src="docs/screenshots/album-theme-pink.webp" width="320" alt="Pink album artwork theme across Sonora's player and controls" /> |
 
 *Three songs, three colour palettes — all generated from their album covers, not preset theme colours.* Choose **Automatic**, **Light** or **Dark** in **Settings → Appearance** to control how those artwork colours are expressed. Palette extraction happens locally on your Mac.
 
