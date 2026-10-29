@@ -9,13 +9,15 @@ import {
   type Track, type Playlist, allTracks, allPlaylists, audioBlob, upsertNativeTracks, deletePlaylist,
   getPref, importOne, putPlaylist, removeTrack, hiddenNativeTrackCount, restoreHiddenNativeTracks, setPref, supportedFile, updateTrack
 } from './store';
+import PlaylistEditor from './PlaylistEditor';
+import { matchesLibrarySearch } from './librarySearch';
 import { AudioMixer, type EQBands } from './audioMixer';
 import { createMixes } from './mixes';
 import { useArtworkTheme, type AppearanceMode } from './artworkTheme';
 
 type Page = 'home'|'search'|'songs'|'albums'|'artists'|'liked'|'recent'|'playlist'|'settings'|'mixes';
 type RepeatMode = 'off'|'all'|'one';
-type PlaylistDraft = {mode:'create'|'rename';value:string;playlistId?:string;trackId?:string};
+type PlaylistDraft = {mode:'create'|'rename'|'edit';value:string;playlistId?:string;trackIds:string[]};
 type SongDraft = {id:string;title:string;artist:string;album:string};
 
 const shortTime=(value:number)=>Number.isFinite(value)&&value>0?Math.floor(value/60)+':'+String(Math.floor(value%60)).padStart(2,'0'):'0:00';
@@ -513,7 +515,7 @@ export default function App() {
   useEffect(()=>{
     const key=(e:KeyboardEvent)=>{
       const target=e.target as HTMLElement|null;
-      if(['INPUT','TEXTAREA','SELECT'].includes(target?.tagName||'')||target?.isContentEditable)return;
+      if(playlistDraft||songDraft||['INPUT','TEXTAREA','SELECT'].includes(target?.tagName||'')||target?.isContentEditable)return;
       if(e.code==='Space'&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
         e.preventDefault();
         if(!e.repeat && !playlistDraft && !songDraft)transportRef.current.toggle();
@@ -604,32 +606,35 @@ export default function App() {
   };
   const createPlaylist=(track?:Track)=>{
     setDialogError('');
-    setPlaylistDraft({mode:'create',value:'',trackId:track?.id});
+    setPlaylistDraft({mode:'create',value:'',trackIds:track?[track.id]:[]});
   };
   const renamePlaylist=(p:Playlist)=>{
     setDialogError('');
-    setPlaylistDraft({mode:'rename',value:p.name,playlistId:p.id});
+    setPlaylistDraft({mode:'rename',value:p.name,playlistId:p.id,trackIds:p.trackIds});
   };
-  const savePlaylistDraft=async()=>{
+  const editPlaylist=(p:Playlist)=>{
+    setPlaylistDraft({mode:'edit',value:p.name,playlistId:p.id,trackIds:p.trackIds});
+  };
+  const savePlaylistDraft=async(name:string,ids:string[])=>{
     if(!playlistDraft)return;
-    const name=playlistDraft.value.trim();
-    if(!name){setDialogError('Enter a playlist name.');return;}
-    if(name.length>120){setDialogError('Keep playlist names under 120 characters.');return;}
-    const duplicate=playlists.some(p=>p.name.toLowerCase()===name.toLowerCase()&&p.id!==playlistDraft.playlistId);
-    if(duplicate){setDialogError('A playlist with that name already exists.');return;}
-    try{
-      if(playlistDraft.mode==='create'){
-        const created:Playlist={id:crypto.randomUUID(),name,createdAt:Date.now(),trackIds:playlistDraft.trackId?[playlistDraft.trackId]:[]};
-        await putPlaylist(created);
-        await refresh();
-        setSelectedPlaylist(created.id);setPage('playlist');setSideOpen(false);
-      }else{
-        const existing=playlists.find(p=>p.id===playlistDraft.playlistId);
-        if(!existing)throw new Error('Playlist no longer exists.');
-        await putPlaylist({...existing,name});await refresh();
-      }
-      setPlaylistDraft(null);setDialogError('');
-    }catch(e){setDialogError('Could not save playlist: '+String(e));}
+    if(!name||name.length>120)throw new Error('Enter a playlist name of 1 to 120 characters.');
+    const savedPlaylists=await allPlaylists();
+    if(savedPlaylists.some(p=>p.name.toLowerCase()===name.toLowerCase()&&p.id!==playlistDraft.playlistId))
+      throw new Error('A playlist with that name already exists.');
+    const available=new Set((await allTracks()).map(track=>track.id));
+    const trackIds=[...new Set(ids)].filter(id=>available.has(id));
+    if(playlistDraft.mode==='create'){
+      const created:Playlist={id:crypto.randomUUID(),name,createdAt:Date.now(),trackIds};
+      await putPlaylist(created);
+      await refresh();
+      setSelectedPlaylist(created.id);setPage('playlist');setSideOpen(false);
+    }else{
+      const existing=savedPlaylists.find(p=>p.id===playlistDraft.playlistId);
+      if(!existing)throw new Error('Playlist no longer exists.');
+      await putPlaylist({...existing,name,trackIds:playlistDraft.mode==='rename'?existing.trackIds:trackIds});
+      await refresh();
+    }
+    setPlaylistDraft(null);
   };
   const editSong=(track:Track)=>{
     setDialogError('');
@@ -681,7 +686,7 @@ export default function App() {
   const albums=useMemo(()=>Array.from(new Set(tracks.map(t=>t.album))).sort(),[tracks]);
   const artists=useMemo(()=>Array.from(new Set(tracks.map(t=>t.artist))).sort(),[tracks]);
   const query=search.trim().toLowerCase();
-  const searchedTracks=tracks.filter(t=>(t.title+' '+t.artist+' '+t.album).toLowerCase().includes(query));
+  const searchedTracks=tracks.filter(t=>matchesLibrarySearch(t,query));
   const visibleTracks=page==='liked'?tracks.filter(t=>t.liked)
     :page==='recent'?tracks.filter(t=>t.playedAt).sort((a,b)=>(b.playedAt||0)-(a.playedAt||0))
     :page==='playlist'?tracks.filter(t=>p?.trackIds.includes(t.id)).sort((a,b)=>(p?.trackIds.indexOf(a.id)||0)-(p?.trackIds.indexOf(b.id)||0))
@@ -804,7 +809,7 @@ export default function App() {
             :page==='albums'&&!selectedAlbum?albums.length+' albums':page==='artists'&&!selectedArtist?artists.length+' artists'
             :page==='playlist'?visibleTracks.length+' tracks · drag songs to reorder':page==='recent'?'The songs you last listened to':'Every detail, just how you like it.'}</p></div>
           <div className="page-actions">
-            {page==='playlist'&&p&&<><button className="outline-button" onClick={()=>void renamePlaylist(p)}>Rename</button><button className="icon-btn danger-icon" title="Delete playlist" onClick={()=>void removePlaylist(p)}><Trash2 size={18}/></button></>}
+            {page==='playlist'&&p&&<><button className="outline-button" onClick={()=>editPlaylist(p)}>Edit songs</button><button className="outline-button" onClick={()=>void renamePlaylist(p)}>Rename</button><button className="icon-btn danger-icon" title="Delete playlist" onClick={()=>void removePlaylist(p)}><Trash2 size={18}/></button></>}
             {(selectedAlbum||selectedArtist)&&<button className="outline-button" onClick={()=>{setSelectedAlbum(null);setSelectedArtist(null);}}>All {page}</button>}
             {visibleTracks.length>0&&page!=='settings'&&(page!=='albums'||!!selectedAlbum)&&(page!=='artists'||!!selectedArtist)&&<button className="play-all" onClick={()=>startSong(visibleTracks[0].id,visibleTracks.map(t=>t.id))}><Play size={18} fill="currentColor"/> Play all</button>}
           </div></div>}
@@ -916,7 +921,7 @@ export default function App() {
             visibleTracks.length>0?<>
               {page==='search'&&<div className="section-heading"><h2>{query?'Search results':'All songs'}</h2><span className="muted">{visibleTracks.length} tracks</span></div>}
               {songList(visibleTracks,page==='playlist'?p:undefined)}
-            </>:<div className="content-empty"><div className="empty-icon big"><Music2 size={34}/></div><h3>{page==='search'?'Nothing found yet':page==='liked'?'No liked songs yet':page==='playlist'?'Nothing in this playlist yet':page==='recent'?'No listening history yet':'Your music is waiting'}</h3><p>{page==='search'?'Try another search or add music to your collection.':page==='liked'?'Tap the heart on a track to save it here.':page==='playlist'?'Open a song’s ••• menu and add it to this playlist.':'Add audio files from your computer to start listening.'}</p><button className="outline-button" onClick={chooseMusic}><Plus size={17}/> Add music</button></div>}
+            </>:<div className="content-empty"><div className="empty-icon big"><Music2 size={34}/></div><h3>{page==='search'?'Nothing found yet':page==='liked'?'No liked songs yet':page==='playlist'?'Nothing in this playlist yet':page==='recent'?'No listening history yet':'Your music is waiting'}</h3><p>{page==='search'?'Try another search or add music to your collection.':page==='liked'?'Tap the heart on a track to save it here.':page==='playlist'?'Choose songs already in your library to add to this playlist.':'Add audio files from your computer to start listening.'}</p>{page==='playlist'&&p?<button className="outline-button" onClick={()=>editPlaylist(p)}><Plus size={17}/> Choose songs</button>:<button className="outline-button" onClick={chooseMusic}><Plus size={17}/> Add music</button>}</div>}
           </>}
           {((page==='albums'&&!selectedAlbum&&!albums.length)||(page==='artists'&&!selectedArtist&&!artists.length))&&<div className="content-empty"><div className="empty-icon big"><Album size={33}/></div><h3>It all starts with a song</h3><p>Import your music and we’ll create your album and artist collections.</p><button className="outline-button" onClick={chooseMusic}>Import songs</button></div>}
         </>}
@@ -940,15 +945,10 @@ export default function App() {
       <div className="lyrics-body">{lyricsLines.length?lyricsLines.map((line,i)=><p key={i} className={'lyric-line '+(line.time<=time && (i===lyricsLines.length-1||lyricsLines[i+1].time>time)?'active':'')}>{line.text}</p>):
         <p>Synced lyrics will appear here when an LRC file is saved beside the song with the same filename. Lyrics are not fetched from unlicensed services.</p>}</div>
     </div>}
-    {playlistDraft&&<div className="dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setPlaylistDraft(null);}}>
-      <form className="edit-dialog" role="dialog" aria-modal="true" aria-label={playlistDraft.mode==='create'?'Create playlist':'Rename playlist'} onSubmit={e=>{e.preventDefault();void savePlaylistDraft();}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setPlaylistDraft(null);}}}>
-        <div className="dialog-top"><div><div className="eyebrow">YOUR MUSIC</div><h2>{playlistDraft.mode==='create'?'Create playlist':'Rename playlist'}</h2></div><button type="button" className="icon-btn" aria-label="Cancel" onClick={()=>setPlaylistDraft(null)}><X size={20}/></button></div>
-        <label className="dialog-label" htmlFor="playlist-name">Playlist name</label>
-        <input id="playlist-name" autoFocus maxLength={120} value={playlistDraft.value} onChange={e=>{setPlaylistDraft({...playlistDraft,value:e.target.value});setDialogError('');}} placeholder="Name your playlist" />
-        {dialogError&&<p className="dialog-error" role="alert">{dialogError}</p>}
-        <div className="dialog-actions"><button type="button" className="outline-button" onClick={()=>setPlaylistDraft(null)}>Cancel</button><button type="submit" className="play-all">Save playlist</button></div>
-      </form>
-    </div>}
+    {playlistDraft&&<PlaylistEditor mode={playlistDraft.mode} initialName={playlistDraft.value}
+      initialIds={playlistDraft.trackIds} tracks={tracks} coverUrls={covers} ready={libraryReady}
+      onSave={savePlaylistDraft} onClose={()=>setPlaylistDraft(null)}/>}
+
     {songDraft&&<div className="dialog-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)setSongDraft(null);}}>
       <form className="edit-dialog" role="dialog" aria-modal="true" aria-label="Edit song details" onSubmit={e=>{e.preventDefault();void saveSongDraft();}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setSongDraft(null);}}}>
         <div className="dialog-top"><div><div className="eyebrow">SONG DETAILS</div><h2>Edit track information</h2></div><button type="button" className="icon-btn" aria-label="Cancel" onClick={()=>setSongDraft(null)}><X size={20}/></button></div>

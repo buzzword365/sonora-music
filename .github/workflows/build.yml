@@ -16,6 +16,8 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npm run test:palette
+      - run: npm run test:playlists
       - run: npm run pack:mac
+      - run: npm run test:package
       - name: Verify packaged macOS application
         run: test -x "release/mac-arm64/Sonora Music.app/Contents/MacOS/Sonora Music"

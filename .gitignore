@@ -41,3 +41,7 @@ tests/*-profile/
 tests/palette-test-build.cjs
 tests/*.png
 tests/*.webm
+
+# Test outputs and local-only audit artifacts
+tests/playlist-results/
+tests/*.log

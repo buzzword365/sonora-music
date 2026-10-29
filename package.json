@@ -1,6 +1,6 @@
 {
   "name": "sonora-personal-music",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,7 +14,9 @@
     "check": "node --check electron/main.mjs && node --check electron/phone-server.mjs && node --check electron/lyrics.mjs && node --check electron/preload.cjs",
     "test:palette": "node tests/palette-regression.mjs",
     "test:e2e": "node tests/adaptive-theme-e2e.mjs",
-    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64"
+    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64",
+    "test:playlists": "node tests/playlists-e2e.mjs && node tests/artist-search-e2e.mjs && node tests/playlist-drag-e2e.mjs",
+    "test:package": "node tests/playlist-package-smoke.mjs"
   },
   "dependencies": {
     "idb": "^8.0.4",

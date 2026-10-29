@@ -2,19 +2,18 @@
 
 An independent macOS music player for your own local music collection, featuring dynamic album-art colour themes, a light/dark appearance studio, music-library management, media controls, and an optional local-network phone companion.
 
-**Version 0.2.0 — More colourful Light mode (28 October 2026)**
+**Version 0.3.0 — Better playlists and library search (29 October 2026)**
 
-## What's new
+## What's new in v0.3.0
 
-Sonora extracts a palette from your current song's embedded cover artwork and applies it throughout the app, including the sidebar, background, player, settings, and queue.
+Create playlists directly from songs you have **already imported**: no need to import audio files again. Search by song, artist or album; select all matches, select individual songs, or drag over consecutive rows to select or deselect a range. Search results show compact embedded album-art thumbnails alongside track details, with a fallback icon when artwork is missing.
 
-In **Settings → Appearance** you can choose:
+- **Smarter search:** typing `alexg`, `Alex G` or `ALEX-G` matches `Alex G` and `alexgoffline` because spacing, case and punctuation are normalised. The same search logic works in the main library and in the playlist picker.
+- **Safe keyboard controls:** pressing Enter inside the picker search no longer submits or closes the dialog. Individual checkboxes remain clickable and keyboard accessible.
+- **Manage playlists:** add and remove saved library tracks, reorder selections, rename playlists and retain edits across app restarts. Bulk selection doesn't lose choices when the query changes.
+- **Regression-tested:** isolated Electron tests cover drag selection, artist search, album covers, editor behaviour, playlist persistence, storage failures, keyboard navigation, audio import and playback. Tests use synthetic data; your library isn't copied into the repository.
 
-- **Automatic** — let the artwork decide whether its theme is light or dark.
-- **Light** — use vibrant, coordinated pastel album colours, with noticeably different shades for the background, sidebar, cards, controls, and player. Black covers now take their accent from the illustration instead of accidentally picking a near-black pixel's hue.
-- **Dark** — use deeper, artwork-tinted surfaces with lighter matching controls.
-
-Switches animate smoothly (650 ms); the macOS reduced-motion setting is respected. Your selection is saved between launches. Missing or monochrome artwork has an accessible fallback. All colour analysis happens **on the device**.
+The existing album-aware Automatic / Light / Dark appearance modes remain available in **Settings → Appearance**, with on-device artwork-derived colours and reduced-motion support.
 
 ### Other features
 
@@ -45,7 +44,9 @@ npm run dev             # Vite UI development server
 npm run build           # Type-check and compile the renderer
 npm run check           # Check native Electron scripts
 npm run test:palette    # Colour and accessibility regression tests
+npm run test:playlists  # Synthetic-library playlist, search and drag tests
 npm run pack:mac        # Package the macOS app
+npm run test:package    # Smoke-test the packaged app
 ```
 
 Run `npm start` to open the built Electron desktop app, or `npm run desktop:dev` alongside `npm run dev` to work on the UI. An optional isolated-profile Electron UI test can be run with `npm run test:e2e`; it uses synthetic fixture tracks and tests the theme transitions and persistence.
@@ -60,7 +61,9 @@ Run `npm start` to open the built Electron desktop app, or `npm run desktop:dev`
 | `src/store.ts` | On-device music metadata and preferences |
 | `src/audioMixer.ts` | Audio mixing, equaliser and crossfading |
 | `electron/` | Native desktop host, secure media access, local phone companion |
-| `tests/` | Pure palette tests and isolated Electron UI regression |
+| `src/PlaylistEditor.tsx` | Playlist picker, multi-select and drag-to-select interactions |
+| `src/librarySearch.ts` | Normalised library and picker search |
+| `tests/` | Synthetic, isolated Electron UI and palette regressions |
 | `dist/` | Precompiled renderer for convenience |
 
 ## Privacy and distribution
