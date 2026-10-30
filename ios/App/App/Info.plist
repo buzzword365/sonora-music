@@ -6,7 +6,9 @@
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
-	<key>CFBundleDisplayName</key>
+	<key>UIBackgroundModes</key>
+  <array><string>audio</string></array>
+  <key>CFBundleDisplayName</key>
         <string>Sonora Music</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>

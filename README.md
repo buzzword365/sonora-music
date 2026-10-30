@@ -100,13 +100,23 @@ npm run ios:simulator     # unsigned iOS Simulator build only
 npm run ios:open          # opens the native Xcode project
 ```
 
-**Current status:** iPhone Simulator build and UI launch verified. Native app
-signing and personal-device installation have not been completed. The iOS
-music-import workflow still uses WebKit/IndexedDB storage: importing, persisting
-and playing large offline libraries, as well as background audio playback,
-remain unverified and need native storage/audio lifecycle development before
-this is considered a reliable standalone iOS music player. The iPhone app does
-not automatically inherit music files from your Mac.
+**Current status:** The iOS Simulator builds and launches successfully. The
+**Add music** button opens a native iOS document picker that copies selected
+audio into Sonora's app-private Documents/SonoraAudio folder without passing
+large audio blobs into IndexedDB. The app reads metadata and embedded artwork,
+skips identical filename/size imports, and retains audio across app relaunches.
+Playback uses a WebKit-accessible local file URL. Audio session/background
+capabilities are configured.
+
+A synthetic MP3 was recovered through the native bridge on the iPhone 17 Pro
+Simulator; a local range request returned 206 and an HTML audio element read
+its duration. This does NOT prove uninterrupted playback under screen lock,
+large-library resilience, or a real Files-picker interaction. Nothing has
+been signed for or installed on a physical device. Existing older
+browser/IndexedDB audio imports remain readable but are not automatically
+migrated to native storage. The iPhone app does not inherit music from your Mac.
+
+See [Native iOS music storage](docs/ios-offline.md) for details and limitations.
 
 For audit evidence and remaining risks, see
 [31 October 2026 audit](docs/audits/2026-10-31-review.md).

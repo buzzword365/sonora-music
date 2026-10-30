@@ -5,7 +5,7 @@ export type Track = {
   id: string; title: string; artist: string; album: string; duration: number;
   size: number; filename: string; fingerprint: string; addedAt: number;
   playedAt?: number; playCount?:number; liked: boolean; cover?: Blob; mime: string; nativeId?: string; nativePath?: string;
-  customTitle?:string;customArtist?:string;customAlbum?:string;
+  customTitle?:string;customArtist?:string;customAlbum?:string; iosFileId?:string;
 };
 export type NativeSong = {
   id:string; path:string; title:string; artist:string; album:string; duration:number;
@@ -34,6 +34,32 @@ export async function upsertNativeTracks(rows:NativeSong[]) {
       fingerprint:'native:'+r.id,addedAt:old?.addedAt||Date.now(),
       playedAt:old?.playedAt,playCount:old?.playCount,liked:old?.liked||false,cover,mime,nativeId:r.id,nativePath:r.path};
     await db.put('tracks',updated);
+  }
+}
+/** Native iOS audio copies live in Documents/SonoraAudio, not IndexedDB blobs.
+ * Reconcile native files into IndexedDB metadata without wiping user edits. */
+export async function upsertIOSTracks(rows:import('./iosMusic').IOSMusicFile[]){
+  const db=await dbp;
+  for(const r of rows){
+    const id='ios-'+r.id;
+    const old=await db.get('tracks',id);
+    let cover=old?.cover;
+    if(!cover&&r.coverBase64){
+      try {
+        const binary=atob(r.coverBase64);
+        cover=new Blob([Uint8Array.from(binary,c=>c.charCodeAt(0))],{type:r.coverMime||'image/jpeg'});
+      } catch {/* Bad embedded artwork must not block the track. */}
+    }
+    const ext=r.filename.split('.').pop()?.toLowerCase();
+    const mime=ext==='mp3'?'audio/mpeg':ext==='m4a'?'audio/mp4':ext==='wav'?'audio/wav':'audio/'+(ext||'unknown');
+    const track:Track={id,iosFileId:r.id,title:old?.customTitle||r.title,
+      artist:old?.customArtist||r.artist,album:old?.customAlbum||r.album,
+      customTitle:old?.customTitle,customArtist:old?.customArtist,customAlbum:old?.customAlbum,
+      duration:r.duration,size:r.size,filename:r.filename,
+      fingerprint:'ios:'+r.id,addedAt:old?.addedAt||Date.now(),
+      liked:old?.liked||false,playedAt:old?.playedAt,playCount:old?.playCount,
+      cover,mime};
+    await db.put('tracks',track);
   }
 }
 export type Playlist = { id: string; name: string; trackIds: string[]; createdAt: number };

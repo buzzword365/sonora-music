@@ -6,13 +6,14 @@ import {
   SlidersHorizontal, Sparkles, Sun, Moon, Trash2, UploadCloud, Volume2, VolumeX, X, Headphones, Clock3, HardDrive, Info, GripVertical, ArrowUp, ArrowDown
 } from 'lucide-react';
 import {
-  type Track, type Playlist, allTracks, allPlaylists, audioBlob, upsertNativeTracks, deletePlaylist,
+  type Track, type Playlist, allTracks, allPlaylists, audioBlob, upsertNativeTracks, upsertIOSTracks, deletePlaylist,
   getPref, importOne, putPlaylist, removeTrack, hiddenNativeTrackCount, restoreHiddenNativeTracks, setPref, supportedFile, updateTrack, recordTrackPlay
 } from './store';
 import PlaylistEditor from './PlaylistEditor';
 import RadioWaveButton from './RadioWaveButton';
 import ThemePicker, { type SurfaceTheme } from './ThemePicker';
 import ListeningStatistics from './ListeningStatistics';
+import {isNativeIOS,iosAudioURL,listIOSMusic,pickIOSMusic,removeIOSMusic} from './iosMusic';
 import ImmersiveNowPlaying from './ImmersiveNowPlaying';
 import { matchesLibrarySearch } from './librarySearch';
 import { AudioMixer, type EQBands } from './audioMixer';
@@ -162,7 +163,18 @@ export default function App() {
       if(est) setStorage({usage:est.usage||0,quota:est.quota||0});
     }
   },[]);
-  useEffect(()=>{void refresh().catch(e=>setError('Could not open local library: '+String(e)));},[refresh]);
+  useEffect(()=>{
+    let active=true;
+    void (async()=>{
+      if(isNativeIOS){
+        const nativeFiles=await listIOSMusic();
+        if(!active)return;
+        await upsertIOSTracks(nativeFiles);
+      }
+      if(active)await refresh();
+    })().catch(e=>setError('Could not open local library: '+String(e)));
+    return ()=>{active=false;};
+  },[refresh]);
   useEffect(()=>{void window.sonoraDesktop?.listMusicFolders().then(setNativeFolders).catch(()=>{});},[]);
   useEffect(()=>{
     if(!window.sonoraDesktop)return;
@@ -235,6 +247,22 @@ export default function App() {
   },[refresh]);
 
   const chooseMusic=()=>{
+    if(isNativeIOS){
+      if(busy)return;
+      setBusy(true);setError('');setImportState('Choose audio files from Files…');
+      void pickIOSMusic().then(async result=>{
+        if(result.canceled)return;
+        setImportState('Adding '+result.files.length+' songs to your iPhone library…');
+        await upsertIOSTracks(result.files);
+        await refresh();
+        if(result.files.length)setPage('songs');
+        if(result.errors?.length||result.duplicates)setError(
+          result.files.length+' added · '+(result.duplicates||0)+' duplicate(s) skipped. '+
+          (result.errors?.slice(0,3).join(' · ')||''));
+      }).catch(e=>setError('Native iPhone import failed: '+String(e)))
+        .finally(()=>{setBusy(false);setImportState('');});
+      return;
+    }
     if(!window.sonoraDesktop){fileInput.current?.click();return;}
     if(busy)return;
     setBusy(true);setImportState('Choose a folder containing your music…');setError('');
@@ -414,24 +442,25 @@ export default function App() {
     if(!target)return;
     pendingFadeRef.current=targetId;
     void (async()=>{
-      const isNative=Boolean(target.nativeId&&window.sonoraDesktop);
+      const isFileBased=Boolean((target.nativeId&&window.sonoraDesktop)||(target.iosFileId&&isNativeIOS));
       let url='';
-      if(isNative)url='sonora-app://localhost/stream/'+target.nativeId;
+      if(target.nativeId&&window.sonoraDesktop)url='sonora-app://localhost/stream/'+target.nativeId;
+      else if(target.iosFileId&&isNativeIOS)url=await iosAudioURL(target.iosFileId);
       else {
         const blob=await audioBlob(targetId);
         if(!blob)throw new Error('Next song is not in the library.');
         url=URL.createObjectURL(blob);
       }
-      if(pendingFadeRef.current!==targetId){if(!isNative)URL.revokeObjectURL(url);return;}
+      if(pendingFadeRef.current!==targetId){if(!isFileBased)URL.revokeObjectURL(url);return;}
       const succeeded=await mixer.crossfadeTo(url,Math.max(.35,Math.min(fadeSeconds,remaining-.15)),()=>{
         audioRef.current=mixer.current;
         fadeHandoffRef.current=targetId;
         pendingFadeRef.current=null;
         startupResumeTrackRef.current=null;
         setCurrentId(targetId);
-      },!isNative);
+      },!isFileBased);
       if(!succeeded){
-        if(!isNative && !mixer.isCrossfading)URL.revokeObjectURL(url);
+        if(!isFileBased && !mixer.isCrossfading)URL.revokeObjectURL(url);
         pendingFadeRef.current=null;
       }
     })().catch(err=>{pendingFadeRef.current=null;console.warn('Crossfade skipped:',err);});
@@ -578,6 +607,10 @@ export default function App() {
         }
         if(selected?.nativeId && window.sonoraDesktop){
           mixer.loadCurrent('sonora-app://localhost/stream/'+selected.nativeId);
+        } else if(selected?.iosFileId && isNativeIOS) {
+          const url=await iosAudioURL(selected.iosFileId);
+          if(closed)return;
+          mixer.loadCurrent(url);
         } else {
           const b=await audioBlob(currentId);
           if(closed)return;
@@ -717,8 +750,16 @@ export default function App() {
     }
   };
   const eraseTrack=async(track:Track)=>{
-    if(!window.confirm('Remove "'+track.title+'" from your local Sonora library? This removes it from Sonora, not your original music folder.'))return;
-    await removeTrack(track.id);if(currentId===track.id){wantPlay.current=false;setCurrentId(null);}await refresh();
+    const details=track.iosFileId&&isNativeIOS
+      ? ' This deletes Sonora’s private iPhone copy, not the original file in Files.'
+      : ' This removes it from Sonora, not your original music folder.';
+    if(!window.confirm('Remove "'+track.title+'" from your local Sonora library?'+details))return;
+    try {
+      if(track.iosFileId&&isNativeIOS)await removeIOSMusic(track.iosFileId);
+      await removeTrack(track.id);
+      if(currentId===track.id){wantPlay.current=false;setCurrentId(null);}
+      await refresh();
+    }catch(e){setError('Could not remove song: '+String(e));}
   };
   const createPlaylist=(track?:Track)=>{
     setDialogError('');
@@ -1012,7 +1053,7 @@ export default function App() {
               <p><strong>Hear both sources:</strong> Connect PS5 audio to your compatible dual-source headset using its console USB/2.4 GHz connection. Connect this Mac to the same headset using Bluetooth, then choose the headset under macOS System Settings → Sound → Output. A wired hardware audio mixer is an alternative.</p>
               <p>PS5 USB Music playback is separate and cannot be controlled this way. Mac and iPhone must share trusted Wi-Fi; keep Sonora running and the Mac powered. While music plays, Sonora prevents app suspension, but closing the MacBook lid may still suspend it.</p>
             </div></div>}
-            <div className="setting-card"><div className="setting-icon"><HardDrive size={24}/></div><div><h3>On-device listening</h3><p>{window.sonoraDesktop?'Folders selected in the Mac app stream directly from your original files. Only metadata, favourites and playlists are saved in Sonora. Keep the source files in place.':'Your imported audio is stored privately in this browser. Clearing website storage can erase this library. Keep your original files.'} We never upload your music.</p></div><span className="setting-badge">LOCAL ONLY</span></div>
+            <div className="setting-card"><div className="setting-icon"><HardDrive size={24}/></div><div><h3>On-device listening</h3><p>{window.sonoraDesktop?'Folders selected in the Mac app stream directly from your original files. Only metadata, favourites and playlists are saved in Sonora. Keep the source files in place.':isNativeIOS?'Audio imported with the Files picker is copied into Sonora’s private iPhone Documents storage, independent of WebKit’s database. Removing the app removes those copies. Keep your original files backed up.':'Your imported audio is stored privately in this browser. Clearing website storage can erase this library. Keep your original files.'} We never upload your music.</p></div><span className="setting-badge">LOCAL ONLY</span></div>
             {window.sonoraDesktop&&<div className="setting-card"><div className="setting-icon"><Trash2 size={24}/></div>
               <div><h3>Restore hidden music</h3>
                 <p>Songs removed from Sonora stay hidden during automatic folder scans, but their original files remain untouched. Restore all hidden folder tracks whenever you want.</p>
