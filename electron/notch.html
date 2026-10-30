@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'">
+  <title>Sonora Notch</title><link rel="stylesheet" href="notch.css">
+</head><body>
+  <div class="notch-card" aria-label="Sonora notch music controls">
+    <div class="notch-glow" aria-hidden="true"></div>
+    <div class="notch-cover" aria-hidden="true"><img id="cover" alt=""><span id="cover-placeholder">♫</span></div>
+    <div class="notch-content">
+      <div class="notch-heading">SONORA <span>· NOW PLAYING</span></div>
+      <strong class="notch-title" id="title">Nothing playing</strong>
+      <span class="notch-artist" id="artist">Choose a song in Sonora</span>
+      <div class="notch-transport">
+        <button type="button" aria-label="Previous song" id="previous" title="Previous">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M19 5 8 12l11 7z"/></svg>
+        </button>
+        <button type="button" aria-label="Play" id="toggle" title="Play or pause">
+          <svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l12 7-12 7z"/></svg>
+          <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M8 5v14M16 5v14"/></svg>
+        </button>
+        <button type="button" aria-label="Next song" id="next" title="Next">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5v14M5 5l11 7-11 7z"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <script src="notch-client.js"></script>
+</body></html>

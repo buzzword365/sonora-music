@@ -55,6 +55,17 @@ export async function allTracks() { return (await (await dbp).getAll('tracks')).
 export async function allPlaylists() { return (await (await dbp).getAll('playlists')).sort((a,b)=>a.createdAt-b.createdAt); }
 export async function audioBlob(id:string) { return (await dbp).get('audio',id); }
 export async function updateTrack(track:Track) { await (await dbp).put('tracks',track); }
+/** Increment a play start against the latest persisted row, without replacing
+ * concurrent edits (likes, title corrections, metadata) with a stale snapshot. */
+export async function recordTrackPlay(id:string):Promise<{playedAt:number;playCount:number}|null> {
+  const db=await dbp,tx=db.transaction('tracks','readwrite');
+  const track=await tx.store.get(id);
+  if(!track){await tx.done;return null;}
+  const playedAt=Date.now(),playCount=(track.playCount||0)+1;
+  await tx.store.put({...track,playedAt,playCount});
+  await tx.done;
+  return {playedAt,playCount};
+}
 export async function putPlaylist(playlist:Playlist) { await (await dbp).put('playlists',playlist); }
 export async function deletePlaylist(id:string) { await (await dbp).delete('playlists',id); }
 export async function getPref<T>(key:string, fallback:T):Promise<T> { const v=await (await dbp).get('prefs',key); return v === undefined ? fallback : v as T; }

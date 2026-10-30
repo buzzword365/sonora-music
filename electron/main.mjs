@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, protocol, globalShortcut, systemPreferences, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, protocol, globalShortcut, systemPreferences, powerSaveBlocker, screen } from 'electron';
 import { createHash } from 'node:crypto';
 import { createReadStream, watch } from 'node:fs';
 import { readdir, readFile, stat, realpath, writeFile } from 'node:fs/promises';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parseFile } from 'music-metadata';
 import { createPhoneServer } from './phone-server.mjs';
 import { lyricsFromTrack } from './lyrics.mjs';
+import {notchPopupBounds,inNotchHoverZone,inPopupZone} from './notch-geometry.mjs';
 import QRCode from 'qrcode';
 const here=path.dirname(fileURLToPath(import.meta.url));
 if(process.env.SONORA_TEST_PROFILE)app.setPath('userData',path.resolve(process.env.SONORA_TEST_PROFILE));
@@ -23,6 +24,75 @@ protocol.registerSchemesAsPrivileged([
 ]);
 let roots=[];const approved=new Map();let win;
 let playbackPowerBlocker=null;
+let notchWindow=null;
+let notchTimer=null;
+let notchEnabled=true;
+let notchLastInside=0;
+let lastNotchStateKey='';
+function notchDisplay(){
+  const displays=screen.getAllDisplays();
+  return displays.find(d=>d.internal===true)||screen.getPrimaryDisplay();
+}
+function currentNotchState(){
+  const playback=snapshot.playback||{};
+  const song=playback.id&&snapshot.tracks.find(t=>t.id===playback.id);
+  const title=String(song?.title||snapshot.notch?.title||'Nothing playing').slice(0,180);
+  const artist=String(song?.artist||snapshot.notch?.artist||'Choose a song in Sonora').slice(0,160);
+  const meta=song?.nativeId&&scannedTracks.get(song.nativeId);
+  const image=meta?.coverBase64 && meta.coverBase64.length<380000
+    ? 'data:'+(meta.coverMime||'image/jpeg')+';base64,'+meta.coverBase64 : '';
+  return {title,artist,artwork:image,playing:Boolean(playback.isPlaying),hasTrack:Boolean(playback.id)};
+}
+function sendNotchState(force=false){
+  if(!notchWindow||notchWindow.isDestroyed()||notchWindow.webContents.isLoading())return;
+  const state=currentNotchState();
+  const key=[state.title,state.artist,state.playing,state.hasTrack,state.artwork.length].join('|');
+  if(!force&&key===lastNotchStateKey)return;
+  lastNotchStateKey=key;
+  notchWindow.webContents.send('sonora:notch-state',state);
+}
+function checkNotchHover(){
+  if(process.platform!=='darwin'||!notchWindow||notchWindow.isDestroyed()||
+     !win||win.isDestroyed()||!notchEnabled||!snapshot.playback?.id){
+    if(notchWindow&&!notchWindow.isDestroyed()&&notchWindow.isVisible())notchWindow.hide();
+    return;
+  }
+  const display=notchDisplay();
+  if(!display)return;
+  const cursor=screen.getCursorScreenPoint();
+  const bounds=notchPopupBounds(display);
+  const hovering=inNotchHoverZone(cursor,display)||
+    (notchWindow.isVisible()&&inPopupZone(cursor,bounds));
+  if(hovering){
+    notchLastInside=Date.now();
+    if(!notchWindow.isVisible()){
+      notchWindow.setBounds(bounds);
+      notchWindow.showInactive();
+      sendNotchState(true);
+    }
+  }else if(notchWindow.isVisible()&&Date.now()-notchLastInside>650){
+    notchWindow.hide();
+  }
+}
+function createNotchWindow(){
+  if(process.platform!=='darwin'||(notchWindow&&!notchWindow.isDestroyed()))return;
+  notchWindow=new BrowserWindow({
+    width:340,height:116,frame:false,transparent:true,show:false,
+    resizable:false,maximizable:false,minimizable:false,skipTaskbar:true,
+    hasShadow:false,alwaysOnTop:true,backgroundColor:'#00000000',
+    webPreferences:{preload:path.join(here,'notch-preload.cjs'),
+      nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}
+  });
+  notchWindow.setAlwaysOnTop(true,'floating');
+  notchWindow.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
+  notchWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  notchWindow.webContents.on('will-navigate',event=>event.preventDefault());
+  notchWindow.webContents.once('did-finish-load',()=>sendNotchState(true));
+  notchWindow.on('closed',()=>{notchWindow=null;lastNotchStateKey='';});
+  void notchWindow.loadFile(path.join(here,'notch.html')).catch(err=>console.warn('Notch player unavailable:',err));
+  if(!notchTimer)notchTimer=setInterval(checkNotchHover,160);
+}
+
 
 let phoneServer=null;
 let phoneQR=null;
@@ -229,8 +299,12 @@ function newWindow(){
  win.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('sonora-app://localhost/')&&!url.startsWith('http://127.0.0.1:5173/'))event.preventDefault();});
  if(process.env.SONORA_DEV_SERVER)win.loadURL(process.env.SONORA_DEV_SERVER);
  else win.loadURL('sonora-app://localhost/index.html');
+ win.on('closed',()=>{if(notchWindow&&!notchWindow.isDestroyed())notchWindow.close();win=null;});
  win.webContents.once('did-finish-load',()=>{
    if(roots.length)setTimeout(()=>void serializedScan(true),900);
+   // Delay the secondary hidden notch window until the main UI is ready.
+   // Keeps the main player as the primary Electron window for launch/tests.
+   setTimeout(()=>{if(win&&!win.isDestroyed())createNotchWindow();},1200);
  });
 }
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
@@ -289,9 +363,23 @@ app.whenReady().then(async()=>{
      playlists:(data.playlists||[]).map(pl=>({id:String(pl.id),name:String(pl.name),trackIds:(pl.trackIds||[]).filter(validTrack)})).slice(0,300),
      mixes:(data.mixes||[]).map(m=>({id:String(m.id),name:String(m.name),subtitle:String(m.subtitle),
        ids:(m.ids||[]).filter(validTrack)})).slice(0,16),
-     playback:data.playback||null,privateMode:Boolean(data.privateMode)
+     playback:data.playback||null,privateMode:Boolean(data.privateMode),
+     notch:{title:String(data.notch?.title||'').slice(0,180),artist:String(data.notch?.artist||'').slice(0,160)}
    };
+   sendNotchState();
  });
+ ipcMain.on('sonora:notch-enabled',(event,enabled)=>{
+   if(win&&event.sender===win.webContents){
+     notchEnabled=Boolean(enabled);
+     if(!notchEnabled&&notchWindow&&!notchWindow.isDestroyed())notchWindow.hide();
+   }
+ });
+ ipcMain.on('sonora:notch-action',(event,action)=>{
+   if(!notchWindow||event.sender!==notchWindow.webContents||
+      !['toggle','previous','next'].includes(action))return;
+   if(win&&!win.isDestroyed())win.webContents.send('sonora:media-action',action);
+ });
+ ipcMain.handle('sonora:notch-support',()=>process.platform==='darwin');
 
  ipcMain.on('sonora:playback-status',(event,playing)=>{
    if(!win||event.sender!==win.webContents)return;
@@ -307,7 +395,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('sonora:media-key-status',()=>mediaStatus());
 
  newWindow();
- app.on('activate',()=>{if(!BrowserWindow.getAllWindows().length)newWindow();});
+ app.on('activate',()=>{if(!win||win.isDestroyed())newWindow();});
 });
 app.on('window-all-closed',()=>{
   updateMediaShortcuts(false);
@@ -320,6 +408,7 @@ app.on('window-all-closed',()=>{
   if(process.platform!=='darwin')app.quit();
 });
 app.on('will-quit',()=>{
+ if(notchTimer){clearInterval(notchTimer);notchTimer=null;}
  stopFolderWatchers();globalShortcut.unregisterAll();
  if(playbackPowerBlocker!==null){powerSaveBlocker.stop(playbackPowerBlocker);playbackPowerBlocker=null;}
  void phoneServer?.close();

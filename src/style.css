@@ -73,3 +73,78 @@
 .sidebar::-webkit-scrollbar{width:6px}
 .sidebar::-webkit-scrollbar-thumb{background:#554561;border-radius:20px}
 .sidebar::-webkit-scrollbar-track{background:transparent}
+
+/* Mix: a deliberately quiet companion to the primary Play all control. */
+.mix-play{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  border:1px solid var(--theme-accent,#b69add);background:var(--theme-hover,#30263b);
+  color:var(--theme-text,#f3eaf8);border-radius:23px;padding:11px 19px;
+  font-size:12px;font-weight:800;white-space:nowrap;transition:background .18s,transform .18s,border-color .18s}
+.mix-play:hover{background:var(--theme-surface-hover,#443452);transform:translateY(-1px)}
+.mix-play:focus-visible{outline:2px solid var(--theme-accent,#c5a4f7);outline-offset:2px}
+.search-list-actions{display:flex;align-items:center;gap:13px}
+@media(max-width:900px){.page-actions{flex-wrap:wrap;justify-content:flex-end}.mix-play{padding:10px 15px}}
+@media(max-width:560px){.page-top{align-items:flex-start;flex-direction:column}.page-actions{width:100%;justify-content:flex-start}.search-list-actions{gap:8px}}
+
+/* Clear, accessible on/off feedback for the collection-specific Mix toggle. */
+.mix-play.is-mixed {
+  background:var(--theme-accent,#bea0ee);
+  border-color:var(--theme-accent,#bea0ee);
+  color:var(--theme-on-accent,#2c1939);
+}
+.mix-play.is-mixed:hover { background:var(--theme-accent-hover,#d2b7fc); }
+.mix-play.is-mixed svg { stroke-width:3; }
+
+/* Restrained oil-film shimmer: a small, thin spectral ripple ONLY on Mix. */
+.radio-wave-button {
+  position:relative;
+  isolation:isolate;
+  overflow:visible;
+  z-index:0;
+}
+.radio-wave-label {
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  gap:9px;
+  position:relative;
+  z-index:1;
+  white-space:nowrap;
+}
+.radio-wave-emission {
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:0;
+  height:0;
+  z-index:-1;
+  pointer-events:none;
+  animation:radio-wave-cleanup 790ms linear both;
+}
+.oil-slick-svg {
+  position:absolute;
+  top:0;
+  left:0;
+  width:184px;
+  height:104px;
+  max-width:none;
+  overflow:visible;
+  transform-origin:center;
+  opacity:0;
+  pointer-events:none;
+  will-change:transform,opacity;
+  animation:oil-slick-radiate 730ms cubic-bezier(.2,.5,.3,1) both;
+}
+@keyframes oil-slick-radiate {
+  0%   {opacity:0; transform:translate(-50%,-50%) scale(.68) rotate(-2deg)}
+  18%  {opacity:.60}
+  45%  {opacity:.66}
+  80%  {opacity:.22}
+  100% {opacity:0; transform:translate(-50%,-50%) scale(1.06) rotate(2deg)}
+}
+@keyframes radio-wave-cleanup {
+  0%,99% {opacity:1}
+  100% {opacity:0}
+}
+@media (prefers-reduced-motion: reduce) {
+  .radio-wave-emission {display:none!important;animation:none!important}
+}

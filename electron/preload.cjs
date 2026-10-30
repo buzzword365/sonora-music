@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('sonoraDesktop',Object.freeze({
  setPlaybackActive:(playing)=>ipcRenderer.send('sonora:playback-status',Boolean(playing)),
  getMediaKeyStatus:()=>ipcRenderer.invoke('sonora:media-key-status'),
  getPhoneInfo:()=>ipcRenderer.invoke('sonora:phone-info'),
+ getNotchSupport:()=>ipcRenderer.invoke('sonora:notch-support'),
+ setNotchEnabled:(enabled)=>ipcRenderer.send('sonora:notch-enabled',Boolean(enabled)),
  getLyrics:(nativeId)=>ipcRenderer.invoke('sonora:lyrics',nativeId),
  syncMobileLibrary:(payload)=>ipcRenderer.send('sonora:library-snapshot',payload),
  onPhoneCommand:(callback)=>{

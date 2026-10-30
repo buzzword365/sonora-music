@@ -1,0 +1,89 @@
+/* Statistics: honest local play-start counts and new time tracking. */
+.app .listening-stats{display:flex;flex-direction:column;gap:21px;min-width:0;border-radius:20px}
+.listening-stats-head{display:flex;gap:16px;align-items:flex-start}
+.listening-stats-head .setting-icon{flex:none;display:grid;place-items:center}
+.app .listening-stats-head h3{font-size:20px;margin:3px 0 7px;letter-spacing:-.5px}
+.app .listening-stats-head p{margin:0;font-size:12px;color:var(--theme-muted);line-height:1.6}
+.listening-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.listening-stat-grid>div{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:16px 14px;
+  border-radius:14px;background:color-mix(in srgb,var(--theme-raised) 77%,transparent);border:1px solid var(--theme-border)}
+.listening-stat-grid svg{color:var(--theme-accent)}
+.listening-stat-grid strong{font-size:clamp(19px,2.4vw,27px);letter-spacing:-1px;color:var(--theme-text);font-variant-numeric:tabular-nums}
+.listening-stat-grid span{color:var(--theme-muted);font-size:10px}
+.listening-stat-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+.stat-list-group{min-width:0}
+.stat-list-group h4{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 16px;color:var(--theme-text)}
+.stat-list-group h4 svg{color:var(--theme-accent)}
+.stat-list-group ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px}
+.stat-list-group li{display:flex;align-items:center;gap:13px;min-width:0}
+.stat-rank{font-size:11px;color:var(--theme-muted);font-variant-numeric:tabular-nums;flex:none}
+.stat-artist,.stat-song{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.stat-artist>div,.stat-song{min-width:0}
+.stat-artist strong,.stat-song strong{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--theme-text)}
+.stat-artist small,.stat-song small{display:block;margin-top:3px;font-size:10px;color:var(--theme-muted)}
+.stat-progress{display:block;height:3px;background:var(--theme-border);border-radius:5px;overflow:hidden}
+.stat-progress i{display:block;height:100%;border-radius:5px;background:var(--theme-accent)}
+.stat-empty{font-size:12px;line-height:1.7;color:var(--theme-muted)}
+.stat-foot{border-top:1px solid var(--theme-border);padding-top:13px;display:flex;gap:6px;flex-direction:column;color:var(--theme-muted);font-size:10px;line-height:1.6}
+.app[data-ui-theme="glass"] .listening-stat-grid>div{background:var(--glass-raised);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-color:var(--glass-border)}
+@media(max-width:650px){.listening-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .listening-stat-columns{grid-template-columns:1fr}.listening-stats-head{gap:10px}}
+
+/* Immersive player — cover stays sharp, backdrop is the only image being blurred. */
+.player-art-trigger{display:grid;place-items:center;background:transparent;padding:0;border:0;border-radius:8px;flex:none}
+.player-art-trigger:focus-visible{outline:2px solid var(--theme-accent);outline-offset:3px}
+.immersive-player{position:fixed;inset:0;z-index:80;overflow:auto;isolation:isolate;display:flex;flex-direction:column;
+  color:#f8f4fa;background:#15131c}
+.immersive-backdrop{position:absolute;inset:-90px;z-index:-2;overflow:hidden}
+.immersive-backdrop img{width:100%;height:100%;object-fit:cover;transform:scale(1.17);filter:blur(85px) saturate(1.32) brightness(.60)}
+.immersive-backdrop-fallback{width:100%;height:100%;background:radial-gradient(ellipse at 25% 40%,#544178,#1a1927 62%),radial-gradient(ellipse at 75% 55%,#537187,transparent)}
+.immersive-veil{position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(120deg,#090912b8,#1410209b 55%,#080a17c0)}
+.immersive-header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:31px clamp(23px,5vw,75px)}
+.immersive-wordmark{font-size:27px;font-weight:850;letter-spacing:-1.8px}
+.immersive-wordmark span{color:#eac9ff}
+.immersive-caption{font-size:10px;letter-spacing:3px;font-weight:850;color:#f4e7fbab}
+.immersive-close{display:flex;align-items:center;gap:8px;padding:11px 16px;color:#fff;border-radius:24px;
+  background:#f8f2ff18;border:1px solid #ffffff47;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.immersive-close:hover{background:#ffffff33}
+.immersive-main{width:min(1100px,100%);margin:auto;display:grid;grid-template-columns:minmax(220px,1fr) minmax(290px,1fr);
+  gap:clamp(35px,6vw,100px);align-items:center;padding:30px clamp(28px,5vw,80px)}
+.immersive-cover-frame{min-width:0;aspect-ratio:1;border-radius:22px;padding:6px;background:linear-gradient(140deg,#ffffff38,#ffffff06 50%,#ffffff1b);
+  border:1px solid #ffffff34;box-shadow:0 25px 80px #03020d77,inset 0 1px 0 #ffffff45}
+.immersive-cover{width:100%;height:100%;object-fit:cover;border-radius:17px;display:grid;place-items:center;aspect-ratio:1}
+.immersive-placeholder{color:#d2bbe9;background:linear-gradient(135deg,#6d4b8f,#415e89)}
+.immersive-detail{min-width:0}
+.immersive-eyebrow{font-size:10px;letter-spacing:2.5px;font-weight:850;color:#e2ceef8c;margin-bottom:20px}
+.immersive-song-title{font-size:clamp(30px,3vw,50px);line-height:1.13;letter-spacing:-1.4px;font-weight:800;margin:0 0 10px;overflow-wrap:anywhere}
+.immersive-song-artist{font-size:clamp(16px,1.65vw,22px);color:#f6eef1d6;margin:0}
+.immersive-album{color:#eadfec88;margin:12px 0 34px;font-size:13px}
+.immersive-progress{margin-top:38px}
+.immersive-progress input[type=range]{width:100%;height:4px;appearance:none;-webkit-appearance:none;border-radius:4px;
+  background:linear-gradient(90deg,#f9f6ff var(--fill),#ffffff40 var(--fill));cursor:pointer}
+.immersive-progress input::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;border-radius:50%;background:white}
+.immersive-time{display:flex;justify-content:space-between;font-size:11px;color:#ede7efae;margin-top:9px;font-variant-numeric:tabular-nums}
+.immersive-transport{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px}
+.immersive-transport button{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;color:#eee9f3;
+  background:transparent;transition:background .18s,transform .18s}
+.immersive-transport button:hover{background:#ffffff23;transform:translateY(-2px)}
+.immersive-transport .immersive-play{width:64px;height:64px;background:#f1eaf7;color:#201d2d;box-shadow:0 6px 24px #0a091b55}
+.immersive-transport .immersive-play:hover{background:white}
+.immersive-transport button.is-active,.immersive-tools button.is-active{color:#eccbff}
+.immersive-tools{margin-top:33px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.immersive-tools button{background:#f8f2ff12;color:#f6eff8;border:1px solid #ffffff38;display:flex;align-items:center;gap:7px;
+  border-radius:23px;padding:9px 12px;font-size:12px}
+.immersive-tools button:hover{background:#f8f2ff30}
+.immersive-volume{display:flex;align-items:center;gap:9px;margin-left:auto}
+.immersive-volume input{width:85px;accent-color:#e7cbff}
+.immersive-footer{padding:21px clamp(23px,5vw,75px);display:flex;justify-content:space-between;gap:15px;
+  font-size:9px;letter-spacing:1.9px;font-weight:850;color:#e1d4e29c}
+@media(max-width:760px){.immersive-main{grid-template-columns:1fr;max-width:520px;gap:24px;padding:18px 28px 35px}
+  .immersive-cover-frame{width:min(310px,78vw);margin:0 auto;border-radius:16px}
+  .immersive-cover{border-radius:12px}
+  .immersive-header{padding:17px 21px}.immersive-caption{display:none}
+  .immersive-wordmark{font-size:23px}
+  .immersive-song-title{font-size:30px}
+  .immersive-detail{text-align:center}
+  .immersive-progress{margin-top:18px}.immersive-album{margin-bottom:14px}
+  .immersive-eyebrow{margin-bottom:9px}
+  .immersive-footer{padding:17px 22px}}
+@media(prefers-reduced-motion:reduce){.immersive-transport button{transition:none}.immersive-backdrop img{transform:none}}

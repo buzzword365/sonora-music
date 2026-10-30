@@ -7,12 +7,17 @@ import {
 } from 'lucide-react';
 import {
   type Track, type Playlist, allTracks, allPlaylists, audioBlob, upsertNativeTracks, deletePlaylist,
-  getPref, importOne, putPlaylist, removeTrack, hiddenNativeTrackCount, restoreHiddenNativeTracks, setPref, supportedFile, updateTrack
+  getPref, importOne, putPlaylist, removeTrack, hiddenNativeTrackCount, restoreHiddenNativeTracks, setPref, supportedFile, updateTrack, recordTrackPlay
 } from './store';
 import PlaylistEditor from './PlaylistEditor';
+import RadioWaveButton from './RadioWaveButton';
+import ThemePicker, { type SurfaceTheme } from './ThemePicker';
+import ListeningStatistics from './ListeningStatistics';
+import ImmersiveNowPlaying from './ImmersiveNowPlaying';
 import { matchesLibrarySearch } from './librarySearch';
 import { AudioMixer, type EQBands } from './audioMixer';
 import { createMixes } from './mixes';
+import { shuffledIds } from './mixPlayback';
 import { useArtworkTheme, type AppearanceMode } from './artworkTheme';
 
 type Page = 'home'|'search'|'songs'|'albums'|'artists'|'liked'|'recent'|'playlist'|'settings'|'mixes';
@@ -77,6 +82,14 @@ export default function App() {
   const [currentId,setCurrentId]=useState<string|null>(null);
   const [queue,setQueue]=useState<string[]>([]);
   const [playing,setPlaying]=useState(false);
+  const [immersiveOpen,setImmersiveOpen]=useState(false);
+  const [notchEnabled,setNotchEnabled]=useState(()=>readSettingShadow('sonora:notch-enabled',true));
+  const [notchSupported,setNotchSupported]=useState(false);
+  useEffect(()=>{
+    if(!window.sonoraDesktop)return;
+    window.sonoraDesktop.setNotchEnabled(notchEnabled);
+    void window.sonoraDesktop.getNotchSupport().then(setNotchSupported).catch(()=>{});
+  },[notchEnabled]);
   const [time,setTime]=useState(0);
   const [duration,setDuration]=useState(0);
   const [volume,setVolume]=useState(0.76);
@@ -92,9 +105,23 @@ export default function App() {
     } catch {}
     return 'auto';
   });
+  const [surfaceTheme,setSurfaceTheme]=useState<SurfaceTheme>(()=>{
+    try{return localStorage.getItem('sonora:surface-theme')==='glass'?'glass':'default';}
+    catch{return 'default';}
+  });
+  const updateSurfaceTheme=(next:SurfaceTheme)=>{
+    try{localStorage.setItem('sonora:surface-theme',next);}catch{}
+    setSurfaceTheme(next);
+    void setPref('surfaceTheme',next).catch(()=>setError('Could not save your theme selection.'));
+  };
+  const [listeningSeconds,setListeningSeconds]=useState<number>(()=>Math.max(0,readSettingShadow('sonora:listen-seconds',0)));
+  const listeningSecondsRef=useRef(listeningSeconds);
+  const listeningClockRef=useRef<{trackId:string;lastPosition:number}>({trackId:'',lastPosition:0});
   const [draggingId,setDraggingId]=useState<string|null>(null);
 
   const [shuffle,setShuffle]=useState(false);
+  const [mixScope,setMixScope]=useState<string|null>(null);
+  const unshuffledQueueRef=useRef<string[]|null>(null);
   const [repeat,setRepeat]=useState<RepeatMode>('off');
   const [showQueue,setShowQueue]=useState(false);
   const [showPlaylistMenu,setShowPlaylistMenu]=useState<string|null>(null);
@@ -159,6 +186,16 @@ export default function App() {
     });
   },[]);
   useEffect(()=>{if(privatePrefsReady.current)void setPref('privateMode',privateMode);},[privateMode]);
+  useEffect(()=>{
+    let active=true;
+    void getPref<SurfaceTheme>('surfaceTheme','default').then(saved=>{
+      if(!active)return;
+      let shadow:string|null=null;
+      try{shadow=localStorage.getItem('sonora:surface-theme');}catch{}
+      setSurfaceTheme(shadow==='glass'||shadow==='default'?shadow:saved==='glass'?'glass':'default');
+    }).catch(()=>{});
+    return ()=>{active=false;};
+  },[]);
   useEffect(()=>{
     let active=true;
     void getPref<AppearanceMode>('appearanceMode','auto').then(saved=>{
@@ -272,13 +309,57 @@ export default function App() {
   const startSong=(id:string,ids?:string[])=>{
     if(!tracks.some(t=>t.id===id)) return;
     startupResumeTrackRef.current=null;
-    if(ids && ids.length) {saveQueue(ids);}
+    if(ids && ids.length) {
+      // A new selection replaces the previous listening session.
+      unshuffledQueueRef.current=null;
+      setShuffle(false);
+      setMixScope(null);
+      saveQueue(ids);
+    }
     mixer.cancelFade();pendingFadeRef.current=null;
     wantPlay.current=true;
     void mixer.unlock().catch(e=>setError('Audio engine failed: '+String(e)));
     if(id===currentId) {
       audioRef.current?.play().catch(()=>setError('Playback was blocked. Press play again to start.'));
     } else setCurrentId(id);
+  };
+  const playMix=(songs:Track[],scope:string|null=null)=>{
+    const original=[...new Set(songs.map(t=>t.id))];
+    if(!original.length)return;
+    const mixed=shuffledIds(original);
+    startSong(mixed[0],mixed);
+    unshuffledQueueRef.current=original;
+    setShuffle(true);
+    setMixScope(scope);
+  };
+  const toggleShuffle=()=>{
+    if(shuffle){
+      if(unshuffledQueueRef.current){
+        const valid=new Set(tracks.map(t=>t.id));
+        const original=unshuffledQueueRef.current.filter(id=>valid.has(id));
+        if(original.length)saveQueue(original);
+      }
+      unshuffledQueueRef.current=null;
+      setShuffle(false);
+      setMixScope(null);
+      return;
+    }
+    const original=activeIds;
+    if(!original.length){setShuffle(true);setMixScope(null);return;}
+    // Preserve the current song and listening history; mix only what's next.
+    const pos=original.indexOf(currentId||'');
+    const mixed=pos>=0
+      ? [...original.slice(0,pos+1),...shuffledIds(original.slice(pos+1))]
+      : shuffledIds(original);
+    unshuffledQueueRef.current=original.slice();
+    saveQueue(mixed);
+    setShuffle(true);
+    setMixScope(null);
+  };
+  const toggleCollectionMix=(songs:Track[],scope:string|null)=>{
+    if(!scope || !songs.length)return;
+    if(shuffle && mixScope===scope)toggleShuffle();
+    else playMix(songs,scope);
   };
   const nextSong=(auto=false)=>{
     if(mixer.isCrossfading && auto)return;
@@ -289,9 +370,7 @@ export default function App() {
     if(auto && repeat==='one' && audio){audio.currentTime=0;void audio.play().catch(()=>{});return;}
     wantPlay.current=true;
     const pos=activeIds.indexOf(currentId);
-    const nextPos=shuffle && activeIds.length>1
-      ? (pos+1+Math.floor(Math.random()*(activeIds.length-1)))%activeIds.length
-      : pos+1;
+    const nextPos=pos+1;
     if(nextPos>=activeIds.length){
       if(repeat==='all') setCurrentId(activeIds[0]);
       else {wantPlay.current=false;setPlaying(false);if(audio)audio.pause();}
@@ -328,7 +407,7 @@ export default function App() {
     if(!Number.isFinite(remaining)||remaining>fadeSeconds+.2||remaining<=.4)return;
     const position=activeIds.indexOf(currentId);
     if(position<0||!activeIds.length)return;
-    const nextIndex=shuffle && activeIds.length>1?(position+1+Math.floor(Math.random()*(activeIds.length-1)))%activeIds.length:position+1;
+    const nextIndex=position+1;
     const targetId=activeIds[nextIndex]||(repeat==='all'?activeIds[0]:null);
     if(!targetId||targetId===currentId)return;
     const target=tracks.find(t=>t.id===targetId);
@@ -373,7 +452,8 @@ export default function App() {
         duration:t.duration,liked:t.liked,playedAt:t.playedAt||0})),
       playlists:playlists.map(p=>({id:p.id,name:p.name,trackIds:p.trackIds})),
       mixes:mixes.map(m=>({id:m.id,name:m.name,subtitle:m.subtitle,ids:m.ids})),
-      playback:{id:currentId,isPlaying:playing,position:time,volume,muted,duration,queue:activeIds,shuffle,repeat},privateMode
+      playback:{id:currentId,isPlaying:playing,position:time,volume,muted,duration,queue:activeIds,shuffle,repeat},privateMode,
+      notch:{title:current?.title||'',artist:current?.artist||''}
     });
   },[tracks,playlists,mixes,currentId,playing,Math.floor(time/2),privateMode,volume,muted,duration,queue.join('|'),shuffle,repeat]);
   useEffect(()=>{
@@ -387,6 +467,40 @@ export default function App() {
       if(action==='previous')transportRef.current.previous();
     });
   },[]);
+  useEffect(()=>{
+    let active=true;
+    void getPref<number>('listeningSeconds',0).then(saved=>{
+      if(!active)return;
+      const shadow=readSettingShadow('sonora:listen-seconds',0);
+      const value=Math.max(0,shadow,saved||0);
+      listeningSecondsRef.current=value;
+      setListeningSeconds(value);
+    }).catch(()=>{});
+    return()=>{active=false;};
+  },[]);
+  useEffect(()=>{
+    const timer=setInterval(()=>{
+      const audio=audioRef.current;
+      if(!audio||!playing||privateMode||!currentId||audio.paused||audio.seeking){
+        listeningClockRef.current={trackId:'',lastPosition:0};return;
+      }
+      const prev=listeningClockRef.current;
+      const position=audio.currentTime;
+      if(prev.trackId===currentId){
+        const delta=position-prev.lastPosition;
+        // Skip large jumps from seeking, stalls or long idle periods.
+        if(delta>0.5&&delta<5){
+          const next=listeningSecondsRef.current+delta;
+          listeningSecondsRef.current=next;
+          setListeningSeconds(next);
+          writeSettingShadow('sonora:listen-seconds',next);
+          void setPref('listeningSeconds',next);
+        }
+      }
+      listeningClockRef.current={trackId:currentId,lastPosition:position};
+    },2500);
+    return()=>clearInterval(timer);
+  },[playing,privateMode,currentId]);
   useEffect(()=>{window.sonoraDesktop?.setPlaybackActive(playing);},[playing]);
   useEffect(()=>{
     window.sonoraDesktop?.setTrackAvailable(Boolean(currentId));
@@ -416,7 +530,7 @@ export default function App() {
     const meta=()=>setDuration(a.duration||0);
     const onplay=()=>setPlaying(true), onpause=()=>setPlaying(false);
     const onend=()=>{if(!mixer.isCrossfading)nextRef.current(true);};
-    const onerror=()=>{if(a.error)setError('The selected audio file could not be decoded by this browser.');};
+    const onerror=()=>{if(currentId&&a.error)setError('The selected audio file could not be decoded by this browser.');};
     a.addEventListener('timeupdate',tick);a.addEventListener('loadedmetadata',meta);
     a.addEventListener('play',onplay);a.addEventListener('pause',onpause);
     a.addEventListener('ended',onend);a.addEventListener('error',onerror);
@@ -475,13 +589,15 @@ export default function App() {
           // A fast-loading file may already have metadata before the await.
           applyStartupPosition();
         }
-        if(wantPlay.current) await audio.play().catch(()=>setError('Press play to allow playback in this browser.'));
-        const existing=tracks.find(t=>t.id===currentId);
-        if(existing && wantPlay.current && privatePrefsReady.current && !privateMode){
-          const playedAt=Date.now();
-          const playCount=(existing.playCount||0)+1;
-          await updateTrack({...existing,playedAt,playCount});
-          if(!closed)setTracks(old=>old.map(t=>t.id===existing.id?{...t,playedAt,playCount}:t));
+        let started=false;
+        if(wantPlay.current){
+          try {await audio.play();started=true;}
+          catch {if(!closed)setError('Press play to allow playback in this browser.');}
+        }
+        // A refused/failed play is not a listening event.
+        if(started&&!closed&&privatePrefsReady.current&&!privateMode){
+          const result=await recordTrackPlay(currentId);
+          if(result&&!closed)setTracks(old=>old.map(t=>t.id===currentId?{...t,...result}:t));
         }
       } catch(e){if(!closed)setError('Cannot load this track: '+String(e));}
     })();
@@ -699,7 +815,24 @@ export default function App() {
     :page==='recent'?'Recently played':page==='playlist'?(p?.name||'Playlist'):page==='albums'?(selectedAlbum||'Albums')
     :page==='artists'?(selectedArtist||'Artists'):page==='mixes'?(mixes.find(m=>m.id===selectedMix)?.name||'Your mixes'):page==='songs'?'Your songs':'Settings';
   const open=(name:Page)=>{setPage(name);setSideOpen(false);setShowQueue(false);if(name!=='albums')setSelectedAlbum(null);if(name!=='artists')setSelectedArtist(null);};
-  const randomPlay=()=>{if(!tracks.length)return;const shuffled=[...tracks].sort(()=>Math.random()-.5);startSong(shuffled[0].id,shuffled.map(t=>t.id));};
+  const randomPlay=()=>playMix(tracks,'songs');
+  const collectionScope=page==='playlist'?(p?'playlist:'+p.id:null)
+    :page==='albums'?(selectedAlbum?'album:'+selectedAlbum:null)
+    :page==='artists'?(selectedArtist?'artist:'+selectedArtist:null)
+    :page==='mixes'?(selectedMix?'personal-mix:'+selectedMix:null)
+    :page==='search'?'search:'+query
+    :page==='songs'||page==='liked'||page==='recent'?page:null;
+  const isCurrentMix=shuffle&&collectionScope!==null&&mixScope===collectionScope;
+  const mixToggle=(searchResults=false)=>(
+    <RadioWaveButton type="button" className={'mix-play'+(isCurrentMix?' is-mixed':'')}
+      aria-label={searchResults?(isCurrentMix?'Turn results Mix off':'Mix results'):(isCurrentMix?'Turn Mix off':'Mix')}
+      aria-pressed={isCurrentMix}
+      title={isCurrentMix?'Mix is on — click to play in original order':'Mix is off — play these songs in random order'}
+      onClick={()=>toggleCollectionMix(visibleTracks,collectionScope)}>
+      {isCurrentMix?<Check size={17}/>:<Shuffle size={17}/>}
+      {isCurrentMix?'Mixed':'Mix'}
+    </RadioWaveButton>
+  );
 
   const songList=(songs:Track[],playlist?:Playlist)=>(
     <div className="tracklist">
@@ -734,7 +867,7 @@ export default function App() {
       </div>)}
     </div>
   );
-  return <div className={'app '+(dropActive?'dropping':'')} data-appearance={appearanceMode} style={artworkTheme} onDragOver={e=>{e.preventDefault();setDropActive(true);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDropActive(false);}} onDrop={onDrop}>
+  return <div className={'app '+(dropActive?'dropping':'')} data-appearance={appearanceMode} data-ui-theme={surfaceTheme} style={artworkTheme} onDragOver={e=>{e.preventDefault();setDropActive(true);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDropActive(false);}} onDrop={onDrop}>
     <input className="sr-only" ref={fileInput} type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.aiff" multiple onChange={fileChange}/>
     {dropActive&&<div className="drop-target"><UploadCloud size={42}/><strong>Drop your music here</strong><span>Your tracks stay on this device</span></div>}
     <aside className={'sidebar '+(sideOpen?'sidebar-open':'')}>
@@ -811,9 +944,22 @@ export default function App() {
           <div className="page-actions">
             {page==='playlist'&&p&&<><button className="outline-button" onClick={()=>editPlaylist(p)}>Edit songs</button><button className="outline-button" onClick={()=>void renamePlaylist(p)}>Rename</button><button className="icon-btn danger-icon" title="Delete playlist" onClick={()=>void removePlaylist(p)}><Trash2 size={18}/></button></>}
             {(selectedAlbum||selectedArtist)&&<button className="outline-button" onClick={()=>{setSelectedAlbum(null);setSelectedArtist(null);}}>All {page}</button>}
-            {visibleTracks.length>0&&page!=='settings'&&(page!=='albums'||!!selectedAlbum)&&(page!=='artists'||!!selectedArtist)&&<button className="play-all" onClick={()=>startSong(visibleTracks[0].id,visibleTracks.map(t=>t.id))}><Play size={18} fill="currentColor"/> Play all</button>}
+            {visibleTracks.length>0&&collectionScope!==null&&<>
+              {mixToggle()}
+              <button className="play-all" onClick={()=>startSong(visibleTracks[0].id,visibleTracks.map(t=>t.id))}><Play size={18} fill="currentColor"/> Play all</button>
+            </>}
           </div></div>}
           {page==='settings'&&<div className="settings-list">
+            <ThemePicker value={surfaceTheme} onChange={updateSurfaceTheme}/>
+            <ListeningStatistics tracks={tracks} seconds={listeningSeconds} privateMode={privateMode}/>
+            {notchSupported&&<section className="setting-card"><div className="setting-icon"><Headphones size={24}/></div>
+              <div><h3>MacBook notch controls</h3>
+                <p>Hover near the camera island at the top centre of your built-in MacBook display for a compact music pop-down. Previous, Play/Pause and Next work even when Sonora is behind another app.</p>
+                <label className="setting-toggle"><input type="checkbox" checked={notchEnabled}
+                  onChange={e=>{setNotchEnabled(e.target.checked);writeSettingShadow('sonora:notch-enabled',e.target.checked);}}/>
+                  Enable notch pop-down</label>
+              </div>
+            </section>}
             <section className="setting-card appearance-setting" aria-labelledby="appearance-title">
               <div className="appearance-heading">
                 <div className="setting-icon appearance-heading-icon"><Sparkles size={23}/></div>
@@ -919,7 +1065,7 @@ export default function App() {
           {page!=='settings'&&!(page==='albums'&&!selectedAlbum)&&!(page==='artists'&&!selectedArtist)&&!(page==='mixes'&&!selectedMix)&&<>
             {page==='playlist'&&!p?<div className="simple-empty">Playlist no longer exists.</div>:
             visibleTracks.length>0?<>
-              {page==='search'&&<div className="section-heading"><h2>{query?'Search results':'All songs'}</h2><span className="muted">{visibleTracks.length} tracks</span></div>}
+              {page==='search'&&<div className="section-heading"><h2>{query?'Search results':'All songs'}</h2><div className="search-list-actions"><span className="muted">{visibleTracks.length} tracks</span>{mixToggle(true)}</div></div>}
               {songList(visibleTracks,page==='playlist'?p:undefined)}
             </>:<div className="content-empty"><div className="empty-icon big"><Music2 size={34}/></div><h3>{page==='search'?'Nothing found yet':page==='liked'?'No liked songs yet':page==='playlist'?'Nothing in this playlist yet':page==='recent'?'No listening history yet':'Your music is waiting'}</h3><p>{page==='search'?'Try another search or add music to your collection.':page==='liked'?'Tap the heart on a track to save it here.':page==='playlist'?'Choose songs already in your library to add to this playlist.':'Add audio files from your computer to start listening.'}</p>{page==='playlist'&&p?<button className="outline-button" onClick={()=>editPlaylist(p)}><Plus size={17}/> Choose songs</button>:<button className="outline-button" onClick={chooseMusic}><Plus size={17}/> Add music</button>}</div>}
           </>}
@@ -960,16 +1106,28 @@ export default function App() {
         <div className="dialog-actions"><button type="button" className="outline-button" onClick={()=>setSongDraft(null)}>Cancel</button><button type="submit" className="play-all">Save changes</button></div>
       </form>
     </div>}
+    {immersiveOpen&&<ImmersiveNowPlaying
+      track={current} cover={current?covers[current.id]:undefined} time={time} duration={duration}
+      playing={playing} shuffle={shuffle} repeat={repeat} volume={muted?0:volume}
+      onClose={()=>setImmersiveOpen(false)}
+      onToggle={togglePlay} onPrevious={previousSong} onNext={()=>nextRef.current(false)}
+      onSeek={position=>{if(audioRef.current)audioRef.current.currentTime=position;setTime(position);}}
+      onLike={()=>{if(current)void like(current);}}
+      onShuffle={toggleShuffle}
+      onRepeat={()=>setRepeat(repeat==='off'?'all':repeat==='all'?'one':'off')}
+      onQueue={()=>{setImmersiveOpen(false);setShowQueue(true);}}
+      onVolume={value=>{writeSettingShadow('sonora:volume-shadow',value);setMuted(false);setVolume(value);}}
+    />}
     <div className="player">
-      <div className="player-song">{current?<><Cover title={current.album} url={covers[current.id]} size="small"/><div className="player-track"><strong>{current.title}</strong><span>{current.artist}</span></div><button className={'icon-btn like-btn '+(current.liked?'is-liked':'')} onClick={()=>void like(current)} title="Like this track"><Heart size={18} fill={current.liked?'currentColor':'none'}/></button></>:<><div className="player-placeholder"><Music2 size={22}/></div><div className="player-track"><strong>Nothing playing</strong><span>Your soundtrack starts here</span></div></>}</div>
+      <div className="player-song">{current?<><button className="player-art-trigger" title="Open immersive Now Playing" aria-label="Open immersive Now Playing" onClick={()=>setImmersiveOpen(true)}><Cover title={current.album} url={covers[current.id]} size="small"/></button><div className="player-track"><strong>{current.title}</strong><span>{current.artist}</span></div><button className={'icon-btn like-btn '+(current.liked?'is-liked':'')} onClick={()=>void like(current)} title="Like this track"><Heart size={18} fill={current.liked?'currentColor':'none'}/></button></>:<><div className="player-placeholder"><Music2 size={22}/></div><div className="player-track"><strong>Nothing playing</strong><span>Your soundtrack starts here</span></div></>}</div>
       <div className="player-center"><div className="player-buttons">
-        <button aria-label="Shuffle" className={'control-btn '+(shuffle?'engaged':'')} onClick={()=>setShuffle(!shuffle)}><Shuffle size={18}/></button>
+        <button aria-label="Shuffle" title={shuffle?'Turn shuffle off':'Shuffle up next'} aria-pressed={shuffle} className={'control-btn '+(shuffle?'engaged':'')} onClick={toggleShuffle}><Shuffle size={18}/></button>
         <button aria-label="Previous" className="control-btn" onClick={previousSong}><SkipBack size={21} fill="currentColor"/></button>
         <button aria-label={playing?'Pause':'Play'} className="main-play" onClick={togglePlay}>{playing?<Pause size={20} fill="currentColor"/>:<Play size={20} fill="currentColor"/>}</button>
         <button aria-label="Next" className="control-btn" onClick={()=>nextRef.current(false)}><SkipForward size={21} fill="currentColor"/></button>
         <button aria-label="Repeat" title={'Repeat: '+repeat} className={'control-btn '+(repeat!=='off'?'engaged':'')} onClick={()=>setRepeat(repeat==='off'?'all':repeat==='all'?'one':'off')}>{repeat==='one'?<Repeat1 size={18}/>:<Repeat size={18}/>}</button>
       </div><div className="seekbar"><span>{shortTime(time)}</span><input type="range" aria-label="Seek" min="0" max={Math.max(1,duration)} step="0.1" value={Math.min(time,Math.max(1,duration))} style={{'--fill':duration>0?(time/duration*100)+'%':'0%'} as React.CSSProperties} onChange={e=>{if(audioRef.current)audioRef.current.currentTime=Number(e.target.value);setTime(Number(e.target.value));}}/><span>{shortTime(duration)}</span></div></div>
-      <div className="player-right"><button title="Lyrics" className="control-btn" onClick={()=>setLyricsOpen(true)}>♫</button>
+      <div className="player-right"><button title="Open immersive Now Playing" aria-label="Expand Now Playing" className="control-btn" onClick={()=>setImmersiveOpen(true)}><Music4 size={19}/></button><button title="Lyrics" className="control-btn" onClick={()=>setLyricsOpen(true)}>♫</button>
         <button title="Play queue" className={'control-btn '+(showQueue?'engaged':'')} onClick={()=>setShowQueue(!showQueue)}><ListMusic size={21}/></button>
         <button aria-label={muted?'Unmute':'Mute'} className="control-btn" onClick={()=>setMuted(!muted)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</button><input aria-label="Volume" type="range" min="0" max="1" step=".01" value={muted?0:volume} style={{'--fill':(muted?0:volume*100)+'%'} as React.CSSProperties} onChange={e=>{const next=Number(e.target.value);writeSettingShadow('sonora:volume-shadow',next);setMuted(false);setVolume(next);}}/><button className="mini-status" onClick={()=>open('settings')}><span className="green-light"/> LOCAL</button>
       </div>
