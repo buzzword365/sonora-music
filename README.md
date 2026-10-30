@@ -61,7 +61,7 @@ npm run pack:mac        # Package the macOS app
 npm run test:package    # Smoke-test the packaged app
 ```
 
-Run `npm start` to open the built Electron desktop app, or `npm run desktop:dev` alongside `npm run dev` to work on the UI. An optional isolated-profile Electron UI test can be run with `npm run test:e2e`; it uses synthetic fixture tracks and tests the theme transitions and persistence.
+Run `npm run build && npm start` to open the Electron desktop app from a fresh clone, or `npm run desktop:dev` alongside `npm run dev` to work on the UI. An optional isolated-profile Electron UI test can be run with `npm run test:e2e`; it uses synthetic fixture tracks and tests the theme transitions and persistence.
 
 ## Source layout
 
@@ -76,10 +76,37 @@ Run `npm start` to open the built Electron desktop app, or `npm run desktop:dev`
 | `src/PlaylistEditor.tsx` | Playlist picker, multi-select and drag-to-select interactions |
 | `src/librarySearch.ts` | Normalised library and picker search |
 | `tests/` | Synthetic, isolated Electron UI and palette regressions |
-| `dist/` | Precompiled renderer for convenience |
+| `dist/` | Generated renderer output (not checked into Git; produced by `npm run build`) |
 
 ## Privacy and distribution
 
 No personal tracks, album-cover collections, listening history, playlists, account tokens, music-folder indexes, or runtime phone pairing credentials are checked in. The phone companion uses your local network and should only be paired on a network you trust; it is not a remote internet music service. Source files are editable under the repository's MIT licence, subject to third-party notices in [THIRD_PARTY.md](THIRD_PARTY.md).
 
 Sonora is an independent personal project, not an official Apple Music or Spotify application.
+
+
+## Native iPhone / iPad development (experimental)
+
+The `ios/` directory is a native Capacitor iOS wrapper around Sonora's React
+interface. It bundles the renderer into the iOS application and **does not need
+a development Mac or web server to launch** once built and installed.
+
+Requires macOS, Xcode and the iOS Simulator or a legitimately authorised device:
+
+```sh
+npm ci
+npm run ios:sync
+npm run ios:simulator     # unsigned iOS Simulator build only
+npm run ios:open          # opens the native Xcode project
+```
+
+**Current status:** iPhone Simulator build and UI launch verified. Native app
+signing and personal-device installation have not been completed. The iOS
+music-import workflow still uses WebKit/IndexedDB storage: importing, persisting
+and playing large offline libraries, as well as background audio playback,
+remain unverified and need native storage/audio lifecycle development before
+this is considered a reliable standalone iOS music player. The iPhone app does
+not automatically inherit music files from your Mac.
+
+For audit evidence and remaining risks, see
+[31 October 2026 audit](docs/audits/2026-10-31-review.md).

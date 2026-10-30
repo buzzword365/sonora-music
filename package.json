@@ -16,9 +16,14 @@
     "test:e2e": "node tests/adaptive-theme-e2e.mjs",
     "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64",
     "test:playlists": "node tests/playlists-e2e.mjs && node tests/artist-search-e2e.mjs && node tests/playlist-drag-e2e.mjs",
-    "test:package": "node tests/playlist-package-smoke.mjs"
+    "test:package": "node tests/playlist-package-smoke.mjs",
+    "ios:sync": "npm run build && cap sync ios",
+    "ios:open": "cap open ios",
+    "ios:simulator": "npm run ios:sync && xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination \"generic/platform=iOS Simulator\" -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build"
   },
   "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
     "idb": "^8.0.4",
     "lucide-react": "^0.468.0",
     "music-metadata": "^12.2.3",
@@ -27,6 +32,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
