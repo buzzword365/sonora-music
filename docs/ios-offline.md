@@ -30,10 +30,40 @@ A synthetic five-second tagged MP3 was copied to the private Documents/SonoraAud
 5. An HTML audio element loaded metadata and reported approximately 5.04 seconds of duration.
 6. The app was rebuilt and relaunched and still showed a music-containing library.
 
-No personal audio was used. Native Files picker tapping, interrupted imports, very large libraries, low-storage conditions, real device playback, screen-lock continuity and background playback remain UNVERIFIED.
+No personal audio was used. Selecting and importing a file through the Files picker, interrupted imports, very large libraries, low-storage conditions, real-device playback, screen-lock continuity and background playback remain UNVERIFIED.
 
 ## Audio and security
 
 UIBackgroundModes audio and the AVAudioSession playback category have been configured, but these alone do not guarantee that WebKit's audio continues while suspended. The plugin confines file operations to the app-private audio folder, checks allowed audio extensions, and uses security-scoped access to selected files when provided. Private copies use file protection until first user authentication to permit access after unlocking.
 
 A valid Apple signing identity and explicit physical-device authorisation would be required for personal iPhone installation. This work does not include App Store deployment, device pairing or credential changes.
+
+
+## Simulator UI regression coverage — 31 October 2026
+
+An iOS UI-testing target (`SonoraUITests`) is included in the shared Xcode
+`App` scheme. It launches the actual Sonora iPhone app, taps **Add music**,
+verifies Apple's native Files picker exposes **Cancel**, and dismisses the
+picker back to Sonora. This exercises the real picker presentation and
+cancellation path; it does **not** test selecting an external file provider
+or returning a selected file to the plugin.
+
+Run in a booted iOS Simulator:
+
+```sh
+npm run ios:sync
+xcodebuild test -project ios/App/App.xcodeproj -scheme App \
+  -destination 'platform=iOS Simulator,id=YOUR_SIMULATOR_UDID' \
+  -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
+```
+
+A post-restart issue in duplicate detection was also fixed: the original
+filename is now read correctly from sidecars containing both an original
+filename and cached metadata. Imports with the same original filename and
+file size are skipped across launches. Native audio copies are marked
+excluded from iCloud device backups because originals must be kept outside
+Sonora. No audio files or signing material are added to Git.
+
+Still unverified: picking and importing a song end-to-end through Files,
+large imports under storage pressure, locked-screen playback, system
+interruptions and physical-device audio.

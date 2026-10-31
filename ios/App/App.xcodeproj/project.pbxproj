@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		32DAB8351F22C0818E8035E6 /* SonoraUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50EBBB148B312E8A6AEE985 /* SonoraUITests.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -15,12 +16,24 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		5BFE15FC2B3BE912A5AF88B9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 72D7342F7697714ECB91C14E /* Foundation.framework */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
-  AACC00100100000000000001 /* SonoraMusicPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACC00200100000000000001 /* SonoraMusicPlugin.swift */; };
-  AACC00100100000000000002 /* SonoraBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACC00200100000000000002 /* SonoraBridgeViewController.swift */; };
+		AACC00100100000000000001 /* SonoraMusicPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACC00200100000000000001 /* SonoraMusicPlugin.swift */; };
+		AACC00100100000000000002 /* SonoraBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AACC00200100000000000002 /* SonoraBridgeViewController.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		6076FC93A67D614E8FCDDC9F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 504EC3031FED79650016851F;
+			remoteInfo = App;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		2CF4E73B331194A4A9E99789 /* SonoraUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SonoraUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -30,10 +43,12 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		72D7342F7697714ECB91C14E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
-  AACC00200100000000000001 /* SonoraMusicPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonoraMusicPlugin.swift; sourceTree = "<group>"; };
-  AACC00200100000000000002 /* SonoraBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonoraBridgeViewController.swift; sourceTree = "<group>"; };
+		AACC00200100000000000001 /* SonoraMusicPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonoraMusicPlugin.swift; sourceTree = "<group>"; };
+		AACC00200100000000000002 /* SonoraBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SonoraBridgeViewController.swift; sourceTree = "<group>"; };
+		F50EBBB148B312E8A6AEE985 /* SonoraUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SonoraUITests.swift; path = SonoraUITests/SonoraUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -42,6 +57,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8048928E386CACC0308AF385 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5BFE15FC2B3BE912A5AF88B9 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -54,6 +77,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				6E12A33A041943A2AD1C06BC /* Frameworks */,
+				C1AEBD8CA945FE6C700F6902 /* SonoraUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -61,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				2CF4E73B331194A4A9E99789 /* SonoraUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -69,8 +95,8 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
-                AACC00200100000000000001 /* SonoraMusicPlugin.swift */,
-                AACC00200100000000000002 /* SonoraBridgeViewController.swift */,
+				AACC00200100000000000001 /* SonoraMusicPlugin.swift */,
+				AACC00200100000000000002 /* SonoraBridgeViewController.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -83,9 +109,51 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		6E12A33A041943A2AD1C06BC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8B8909A9492E24833F4C3BB0 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8B8909A9492E24833F4C3BB0 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				72D7342F7697714ECB91C14E /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		C1AEBD8CA945FE6C700F6902 /* SonoraUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F50EBBB148B312E8A6AEE985 /* SonoraUITests.swift */,
+			);
+			name = SonoraUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3ED82EDCAA77E26ADD749688 /* SonoraUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0D744F6A0B1E7CEEB27273 /* Build configuration list for PBXNativeTarget "SonoraUITests" */;
+			buildPhases = (
+				0E24FD4258F63C563FA289D9 /* Sources */,
+				8048928E386CACC0308AF385 /* Frameworks */,
+				FF03FAB7FDAA61776D273CEF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				985F744DCCE24D2CCEDFC976 /* PBXTargetDependency */,
+			);
+			name = SonoraUITests;
+			productName = SonoraUITests;
+			productReference = 2CF4E73B331194A4A9E99789 /* SonoraUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -139,6 +207,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				3ED82EDCAA77E26ADD749688 /* SonoraUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -157,21 +226,45 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		FF03FAB7FDAA61776D273CEF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		0E24FD4258F63C563FA289D9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				32DAB8351F22C0818E8035E6 /* SonoraUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
-                AACC00100100000000000001 /* SonoraMusicPlugin.swift in Sources */,
-                AACC00100100000000000002 /* SonoraBridgeViewController.swift in Sources */,
+				AACC00100100000000000001 /* SonoraMusicPlugin.swift in Sources */,
+				AACC00100100000000000002 /* SonoraBridgeViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		985F744DCCE24D2CCEDFC976 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = App;
+			target = 504EC3031FED79650016851F /* App */;
+			targetProxy = 6076FC93A67D614E8FCDDC9F /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -193,6 +286,22 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		1D50B399A88CCCA99B0A2C7E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sonora.personalplayer.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = App;
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -346,6 +455,23 @@
 			};
 			name = Release;
 		};
+		7725F3CA82FB323C2BD28EF6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGNING_ALLOWED = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sonora.personalplayer.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = App;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -363,6 +489,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0D744F6A0B1E7CEEB27273 /* Build configuration list for PBXNativeTarget "SonoraUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7725F3CA82FB323C2BD28EF6 /* Release */,
+				1D50B399A88CCCA99B0A2C7E /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

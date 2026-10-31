@@ -25,6 +25,12 @@ public class SonoraMusicPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
     private func ensureStorage() throws {
         try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: true,
                                                  attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
+        // Imported copies can be recreated from the user's original files.
+        // Avoid uploading full music libraries as part of iCloud device backup.
+        var directory = storage
+        var attributes = URLResourceValues()
+        attributes.isExcludedFromBackup = true
+        try directory.setResourceValues(attributes)
     }
     private func safeFile(_ id: String) throws -> URL {
         guard !id.isEmpty, id == (id as NSString).lastPathComponent,
@@ -39,8 +45,8 @@ public class SonoraMusicPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
     private func originalName(_ url: URL) -> String {
         let sidecarURL = sidecar(url)
         if let content = try? Data(contentsOf: sidecarURL),
-           let json = try? JSONSerialization.jsonObject(with: content) as? [String: String],
-           let name = json["original"], !name.isEmpty { return name }
+           let json = try? JSONSerialization.jsonObject(with: content) as? [String: Any],
+           let name = json["original"] as? String, !name.isEmpty { return name }
         return url.lastPathComponent
     }
     private func cachedMetadata(_ url: URL) -> [String: Any]? {
