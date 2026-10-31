@@ -1,0 +1,21 @@
+name: Native notch helper prototype check
+on:
+  push:
+    branches:
+      - feature/boring-notch-native-helper-20261101
+  workflow_dispatch:
+jobs:
+  native-helper:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Swift toolchain
+        run: swiftc --version
+      - name: Compile the isolated GPL native helper
+        working-directory: native/boring-notch-helper
+        run: |
+          swiftc -o /tmp/sonora-native-notch \
+            BoringNotchWindow.swift NotchShape.swift SonoraNativeNotch.swift \
+            -framework AppKit -framework SwiftUI
+      - name: Verify output
+        run: test -x /tmp/sonora-native-notch
