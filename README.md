@@ -1,8 +1,12 @@
 # Sonora Music
 
-An independent macOS music player for your own local music collection, featuring dynamic album-art colour themes, a light/dark appearance studio, music-library management, media controls, and an optional local-network phone companion.
+A local-first music player built around your own library. Sonora brings together playlists, fast search, artwork-responsive themes, and native playback controls without relying on a streaming catalogue.
 
-**Version 0.3.0 — Better playlists and library search (29 October 2026)**
+**Platforms:** macOS desktop · iOS development build  
+**Stack:** Electron · React · TypeScript · Capacitor  
+**Latest documented desktop release:** v0.3.0 · [Releases](https://github.com/buzzword365/sonora-music/releases)
+
+Native fullscreen and notch-player refinements are available on the [macOS development branch](https://github.com/buzzword365/sonora-music/tree/fix/sonora-macos-native-fullscreen-20261102).
 
 
 ## Your album art, your atmosphere
