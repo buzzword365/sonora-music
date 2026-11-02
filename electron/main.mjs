@@ -1,6 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, protocol, globalShortcut, systemPreferences, powerSaveBlocker, screen } from 'electron';
 import { createHash } from 'node:crypto';
-import { createReadStream, watch } from 'node:fs';
+import { createReadStream, watch, existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createNativeIslandSender } from './native-island-state.mjs';
+import { FullscreenTransitionGuard } from './fullscreen-transition.mjs';
 import { readdir, readFile, stat, realpath, writeFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import path from 'node:path';
@@ -8,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parseFile } from 'music-metadata';
 import { createPhoneServer } from './phone-server.mjs';
 import { lyricsFromTrack } from './lyrics.mjs';
-import {notchPopupBounds,inNotchHoverZone,inPopupZone} from './notch-geometry.mjs';
+import {notchPopupBounds,isNotchHovered} from './notch-geometry.mjs';
 import QRCode from 'qrcode';
 const here=path.dirname(fileURLToPath(import.meta.url));
 if(process.env.SONORA_TEST_PROFILE)app.setPath('userData',path.resolve(process.env.SONORA_TEST_PROFILE));
@@ -26,6 +29,14 @@ let roots=[];const approved=new Map();let win;
 let playbackPowerBlocker=null;
 let notchWindow=null;
 let notchTimer=null;
+let notchDismissTimer=null;
+let notchSpaceTimer=null;
+const fullscreenTransition = new FullscreenTransitionGuard();
+let nativeIsland=null;
+let nativeIslandReady=false;
+let nativeIslandFailed=false;
+let nativeIslandStopping=false;
+let nativeIslandSender=null;
 let notchEnabled=true;
 let notchLastInside=0;
 let lastNotchStateKey='';
@@ -41,54 +52,235 @@ function currentNotchState(){
   const meta=song?.nativeId&&scannedTracks.get(song.nativeId);
   const image=meta?.coverBase64 && meta.coverBase64.length<380000
     ? 'data:'+(meta.coverMime||'image/jpeg')+';base64,'+meta.coverBase64 : '';
-  return {title,artist,artwork:image,playing:Boolean(playback.isPlaying),hasTrack:Boolean(playback.id)};
+  // The renderer can temporarily announce a track ID before its library
+  // metadata has hydrated. Do not present a large empty 'Nothing playing'
+  // island as if there were a selectable song.
+  const hasTrack=Boolean(playback.id&&(song||snapshot.notch?.title?.trim()));
+  return {
+    title,artist,artwork:image,trackId:String(playback.id||''),
+    playing:Boolean(playback.isPlaying&&hasTrack),hasTrack,
+    position:Number.isFinite(playback.position)?Math.max(0,playback.position):0,
+    duration:Number.isFinite(playback.duration)&&playback.duration>0?playback.duration:(Number(song?.duration)||0)
+  };
 }
 function sendNotchState(force=false){
+  if(nativeIslandReady&&nativeIslandSender){
+    nativeIslandSender.write(currentNotchState(),force);
+  }
   if(!notchWindow||notchWindow.isDestroyed()||notchWindow.webContents.isLoading())return;
   const state=currentNotchState();
-  const key=[state.title,state.artist,state.playing,state.hasTrack,state.artwork.length].join('|');
-  if(!force&&key===lastNotchStateKey)return;
-  lastNotchStateKey=key;
-  notchWindow.webContents.send('sonora:notch-state',state);
+  // Cover art can change without its encoded byte length changing. Include
+  // the content fingerprint so repeated album artwork updates are not lost.
+  const artworkHash=state.artwork?createHash('sha1').update(state.artwork).digest('hex'):'';
+  const key=[state.trackId,state.title,state.artist,state.playing,state.hasTrack,state.duration,artworkHash].join('|');
+  if(force||key!==lastNotchStateKey){
+    lastNotchStateKey=key;
+    notchWindow.webContents.send('sonora:notch-state',state);
+  }else{
+    notchWindow.webContents.send('sonora:notch-progress',{
+      position:state.position,duration:state.duration,playing:state.playing
+    });
+  }
 }
 function checkNotchHover(){
-  if(process.platform!=='darwin'||!notchWindow||notchWindow.isDestroyed()||
-     !win||win.isDestroyed()||!notchEnabled||!snapshot.playback?.id){
+  if(process.platform!=='darwin'||!win||win.isDestroyed())return;
+  // Do not permit the legacy overlay to appear over a fullscreen
+  // transition. Its all-Spaces window was able to steal the active Space.
+  // The native accessory helper has its own separate hover loop.
+  if(win.isFullScreen()||fullscreenTransition.suppressesFocus()){
     if(notchWindow&&!notchWindow.isDestroyed()&&notchWindow.isVisible())notchWindow.hide();
+    return;
+  }
+  // Recover if the secondary overlay renderer/window unexpectedly closes.
+  // Never create the Electron overlay inside a native fullscreen Space.
+  // The packaged Swift accessory helper handles fullscreen independently.
+  if((!notchWindow||notchWindow.isDestroyed())&&notchEnabled){
+    if(!win.isFullScreen()&&!fullscreenTransition.suppressesFocus())createNotchWindow();
+    return;
+  }
+  if(!notchWindow||notchWindow.isDestroyed())return;
+  if(!notchEnabled||!currentNotchState().hasTrack){
+    if(notchDismissTimer){clearTimeout(notchDismissTimer);notchDismissTimer=null;}
+    if(notchWindow.isVisible())notchWindow.hide();
     return;
   }
   const display=notchDisplay();
   if(!display)return;
   const cursor=screen.getCursorScreenPoint();
   const bounds=notchPopupBounds(display);
-  const hovering=inNotchHoverZone(cursor,display)||
-    (notchWindow.isVisible()&&inPopupZone(cursor,bounds));
+  // macOS may move a shown borderless window below the camera/menu bar.
+  // Use its *actual* frame for mouse hit-testing so the bottom controls
+  // remain usable instead of dismissing the island prematurely.
+  const shownBounds=notchWindow.isVisible()?notchWindow.getBounds():bounds;
+  const hovering=isNotchHovered(cursor,display,shownBounds,notchWindow.isVisible());
   if(hovering){
     notchLastInside=Date.now();
+    if(notchDismissTimer){
+      clearTimeout(notchDismissTimer);
+      notchDismissTimer=null;
+      notchWindow.webContents.send('sonora:notch-visible',true);
+    }
     if(!notchWindow.isVisible()){
       notchWindow.setBounds(bounds);
       notchWindow.showInactive();
       sendNotchState(true);
     }
-  }else if(notchWindow.isVisible()&&Date.now()-notchLastInside>650){
-    notchWindow.hide();
+  }else if(notchWindow.isVisible()&&!notchDismissTimer&&Date.now()-notchLastInside>1050){
+    // Let the island retract into the camera cutout before hiding the panel.
+    notchWindow.webContents.send('sonora:notch-visible',false);
+    notchDismissTimer=setTimeout(()=>{
+      notchDismissTimer=null;
+      if(!notchWindow||notchWindow.isDestroyed()||!notchWindow.isVisible())return;
+      // A cursor can return between the 160ms poll ticks and this timer.
+      // Check its *current* position before completing the disappearance.
+      const latestDisplay=notchDisplay();
+      if(latestDisplay&&isNotchHovered(
+        screen.getCursorScreenPoint(),latestDisplay,notchWindow.getBounds(),true
+      )){
+        notchLastInside=Date.now();
+        notchWindow.webContents.send('sonora:notch-visible',true);
+        return;
+      }
+      if(Date.now()-notchLastInside>1050)notchWindow.hide();
+    },230);
   }
 }
+function refreshNotchAfterSpaceChange(){
+  // macOS sometimes anchors an all-Spaces window to the old fullscreen
+  // Space when the host transitions. Recreate only on a Space transition;
+  // app switching itself must leave this independent overlay untouched.
+  if(!notchWindow||notchWindow.isDestroyed()||!win||win.isDestroyed())return;
+  if(notchDismissTimer){clearTimeout(notchDismissTimer);notchDismissTimer=null;}
+  notchWindow.destroy();
+  notchLastInside=0;
+  // An ordinary Electron overlay can bring the wrong Space forward when
+  // recreated over fullscreen. Keep it closed in fullscreen; the native
+  // Swift nonactivating panel remains available, and fallback resumes on exit.
+  if(!win.isFullScreen()&&!fullscreenTransition.suppressesFocus())createNotchWindow();
+}
+function stopNativeIsland(){
+  nativeIslandStopping=true;
+  nativeIslandReady=false;
+  if(nativeIslandSender){nativeIslandSender.close();nativeIslandSender=null;}
+  if(nativeIsland){nativeIsland.kill();nativeIsland=null;}
+}
+function startNativeIsland(){
+  // The native, nonactivating macOS panel is a separate accessory process.
+  // It is only used when packaged; automated Electron tests use the stable
+  // legacy overlay, and SONORA_USE_ELECTRON_ISLAND=1 is an explicit fallback.
+  if(!app.isPackaged||process.env.SONORA_TEST_PROFILE||
+     process.env.SONORA_USE_ELECTRON_ISLAND==='1'||nativeIslandFailed)return false;
+  const executable=path.join(process.resourcesPath,'sonora-island-helper');
+  if(!existsSync(executable))return false;
+  let child;
+  try {
+    child=spawn(executable,[],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+  }catch(error){
+    console.warn('Native Sonora island unavailable:',error);
+    nativeIslandFailed=true;
+    return false;
+  }
+  nativeIsland=child;nativeIslandStopping=false;nativeIslandReady=false;
+  nativeIslandSender=createNativeIslandSender(child.stdin);
+  let output='';
+  const timeout=setTimeout(()=>{
+    if(nativeIsland===child&&!nativeIslandReady){
+      console.warn('Native island startup timed out; using Electron fallback');
+      nativeIslandFailed=true;child.kill();
+    }
+  },5000);
+  child.stdout.on('data',data=>{
+    output+=String(data);
+    if(output.length>16384){output='';return;}
+    let newline;
+    while((newline=output.indexOf('\n'))!==-1){
+      const line=output.slice(0,newline).trim();output=output.slice(newline+1);
+      let msg;
+      try{msg=JSON.parse(line);}catch{continue;}
+      if(msg.event==='ready'){
+        nativeIslandReady=true;clearTimeout(timeout);sendNotchState(true);
+      }else if(typeof msg.action==='string'){
+        if(!win||win.isDestroyed())continue;
+        if(msg.action==='open')showMainWindow();
+        else if(msg.action==='seek'&&Number.isFinite(msg.position)&&msg.position>=0){
+          const duration=currentNotchState().duration;
+          if(duration>0)win.webContents.send('sonora:phone-command',{
+            action:'seek-mac',position:Math.min(duration,msg.position)
+          });
+        }else if(['toggle','previous','next'].includes(msg.action)){
+          win.webContents.send('sonora:media-action',msg.action);
+        }
+      }
+    }
+  });
+  child.stderr.on('data',data=>console.warn('Native island:',String(data).slice(0,1000)));
+  child.stdin.on('error',error=>console.warn('Native island input closed:',error.message));
+  child.on('error',error=>{console.warn('Native island failed:',error);nativeIslandFailed=true;});
+  child.on('exit',(code,signal)=>{
+    clearTimeout(timeout);
+    if(nativeIsland!==child)return;
+    const stopping=nativeIslandStopping;
+    nativeIsland=null;nativeIslandReady=false;
+    if(nativeIslandSender){nativeIslandSender.close();nativeIslandSender=null;}
+    if(!stopping&&win&&!win.isDestroyed()){
+      console.warn('Native island exited; restoring Electron mini player:',code,signal);
+      nativeIslandFailed=true;
+      createNotchWindow();
+    }
+  });
+  return true;
+}
 function createNotchWindow(){
-  if(process.platform!=='darwin'||(notchWindow&&!notchWindow.isDestroyed()))return;
+  if(process.platform!=='darwin'||!notchEnabled||(notchWindow&&!notchWindow.isDestroyed()))return;
+  if(nativeIsland||startNativeIsland())return;
+  // A helper failure must not create an extra all-Spaces Electron window in
+  // fullscreen. Prefer no island temporarily to switching the user's Space.
+  if(win?.isFullScreen()||fullscreenTransition.suppressesFocus())return;
   notchWindow=new BrowserWindow({
-    width:340,height:116,frame:false,transparent:true,show:false,
+    // Independent non-fullscreenable window: unlike a parent-owned popup it
+    // remains available when the user switches apps or macOS Spaces. Avoid
+    // type:'panel' (NSPanel) and the pop-up-menu window level: those changed
+    // the system menu-bar appearance on this Mac.
+    fullscreenable:false,
+    width:308,height:134,frame:false,transparent:true,show:false,
     resizable:false,maximizable:false,minimizable:false,skipTaskbar:true,
     hasShadow:false,alwaysOnTop:true,backgroundColor:'#00000000',
     webPreferences:{preload:path.join(here,'notch-preload.cjs'),
       nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}
   });
+  // Floating, not menu-level. Use an ordinary window instead of an NSPanel,
+  // with a transparent background and bounds wholly below the menu bar.
+  // This lets the player follow across apps and fullscreen Spaces without
+  // becoming its own fullscreen window.
   notchWindow.setAlwaysOnTop(true,'floating');
   notchWindow.setVisibleOnAllWorkspaces(true,{visibleOnFullScreen:true});
+  // Electron temporarily turns the entire process into a macOS accessory
+  // app when enabling cross-Space visibility, removing Sonora's Dock
+  // running indicator. Restore regular app/Dock status afterward while
+  // retaining the independent island's all-Spaces capability.
+  if(process.platform==='darwin' && app.dock){
+    void app.dock.show().catch(error=>console.warn('Could not restore Sonora Dock icon:',error));
+  }
+  notchWindow.on('show',()=>notchWindow?.webContents.send('sonora:notch-visible',true));
+  notchWindow.on('hide',()=>notchWindow?.webContents.send('sonora:notch-visible',false));
   notchWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   notchWindow.webContents.on('will-navigate',event=>event.preventDefault());
-  notchWindow.webContents.once('did-finish-load',()=>sendNotchState(true));
-  notchWindow.on('closed',()=>{notchWindow=null;lastNotchStateKey='';});
+  const thisPanel=notchWindow;
+  thisPanel.webContents.once('did-finish-load',()=>{
+    if(thisPanel.isDestroyed()||notchWindow!==thisPanel)return;
+    sendNotchState(true);
+    // 'show' may fire before the renderer installs its IPC listeners.
+    thisPanel.webContents.send('sonora:notch-visible',thisPanel.isVisible());
+  });
+  thisPanel.webContents.on('render-process-gone',(_event,details)=>{
+    console.warn('Sonora island renderer stopped:',details.reason);
+    if(notchWindow===thisPanel&&!thisPanel.isDestroyed())thisPanel.destroy();
+  });
+  thisPanel.on('closed',()=>{
+    if(notchWindow!==thisPanel)return;
+    if(notchDismissTimer){clearTimeout(notchDismissTimer);notchDismissTimer=null;}
+    notchWindow=null;lastNotchStateKey='';
+  });
   void notchWindow.loadFile(path.join(here,'notch.html')).catch(err=>console.warn('Notch player unavailable:',err));
   if(!notchTimer)notchTimer=setInterval(checkNotchHover,160);
 }
@@ -291,15 +483,62 @@ async function media(request){
   return new Response(request.method==='HEAD'?null:Readable.toWeb(createReadStream(p,{start,end})),{status,headers});
  }catch{return error(404,'Missing audio');}
 }
+function sendMainWindowState(){
+ if(win&&!win.isDestroyed()&&!win.webContents.isDestroyed())
+   win.webContents.send('sonora:window-state',{fullscreen:win.isFullScreen(),maximized:win.isMaximized()});
+}
 function newWindow(){
  win=new BrowserWindow({width:1380,height:900,minWidth:830,minHeight:550,backgroundColor:'#121115',
-  title:'Sonora Music',titleBarStyle:'hiddenInset',trafficLightPosition:{x:18,y:16},
+  // Use the native macOS title bar in normal and maximised windows so the
+  // close / minimise / green zoom buttons are always present and usable.
+  title:'Sonora Music',titleBarStyle:'hiddenInset',trafficLightPosition:{x:16,y:15},
+  // This is the MAIN player. The green traffic-light button must enter
+  // genuine macOS fullscreen (its own Space), NOT same-desktop zoom.
+  // Only the separate mini-player is nonfullscreenable.
+  fullscreenable:true,
   webPreferences:{preload:path.join(here,'preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  win.webContents.on('will-navigate',(event,url)=>{if(!url.startsWith('sonora-app://localhost/')&&!url.startsWith('http://127.0.0.1:5173/'))event.preventDefault();});
  if(process.env.SONORA_DEV_SERVER)win.loadURL(process.env.SONORA_DEV_SERVER);
  else win.loadURL('sonora-app://localhost/index.html');
- win.on('closed',()=>{if(notchWindow&&!notchWindow.isDestroyed())notchWindow.close();win=null;});
+ const scheduleNotchSpaceRefresh=()=>{
+   // The packaged native island is already visible on fullscreen Spaces and
+   // must not be restarted as part of the host window's transition.
+   if(nativeIsland)return;
+   if(notchSpaceTimer)clearTimeout(notchSpaceTimer);
+   notchSpaceTimer=setTimeout(()=>{
+     notchSpaceTimer=null;
+     refreshNotchAfterSpaceChange();
+     // If the fallback was suspended entering fullscreen, restore it on exit.
+     if(!win?.isFullScreen()&&!notchWindow&&notchEnabled)createNotchWindow();
+   },1250);
+ };
+ const beginFullscreenTransition=()=>{
+   fullscreenTransition.begin();
+   // Hide the fallback before the native animation starts. The nonactivating
+   // native helper stays untouched across Spaces.
+   if(notchWindow&&!notchWindow.isDestroyed())notchWindow.hide();
+ };
+ win.on('will-enter-full-screen',beginFullscreenTransition);
+ win.on('will-leave-full-screen',beginFullscreenTransition);
+ win.on('enter-full-screen',()=>{
+   fullscreenTransition.end();
+   sendMainWindowState();
+   scheduleNotchSpaceRefresh();
+ });
+ win.on('leave-full-screen',()=>{
+   fullscreenTransition.end();
+   sendMainWindowState();
+   scheduleNotchSpaceRefresh();
+ });
+ win.on('maximize',sendMainWindowState);
+ win.on('unmaximize',sendMainWindowState);
+ win.on('closed',()=>{
+   if(notchSpaceTimer){clearTimeout(notchSpaceTimer);notchSpaceTimer=null;}
+   stopNativeIsland();
+   if(notchWindow&&!notchWindow.isDestroyed())notchWindow.close();
+   win=null;
+ });
  win.webContents.once('did-finish-load',()=>{
    if(roots.length)setTimeout(()=>void serializedScan(true),900);
    // Delay the secondary hidden notch window until the main UI is ready.
@@ -307,12 +546,20 @@ function newWindow(){
    setTimeout(()=>{if(win&&!win.isDestroyed())createNotchWindow();},1200);
  });
 }
+function showMainWindow(){
+ // A spurious Dock/app activation during a macOS fullscreen animation must
+ // not refocus the main window and yank the user back to the prior Space.
+ if(fullscreenTransition.suppressesFocus()&&win&&!win.isDestroyed())return;
+ if(process.platform==='darwin')app.show();
+ if(!win||win.isDestroyed()){newWindow();return;}
+ if(win.isMinimized())win.restore();
+ if(!win.isVisible())win.show();
+ else if(!win.isFocused())win.focus();
+}
 const hasSingleInstanceLock=app.requestSingleInstanceLock();
 if(!hasSingleInstanceLock){app.quit();}
 else {
-app.on('second-instance',()=>{
- if(win && !win.isDestroyed()){if(win.isMinimized())win.restore();win.focus();}
-});
+app.on('second-instance',showMainWindow);
 // Enable playback started by a paired phone remote even when the Mac has no recent input.
 app.commandLine.appendSwitch('autoplay-policy','no-user-gesture-required');
 app.whenReady().then(async()=>{
@@ -349,6 +596,21 @@ app.whenReady().then(async()=>{
   enableFolderWatchers();
   return {canceled:false,...result};
  });
+ ipcMain.handle('sonora:window-state',event=>{
+   if(!win||win.isDestroyed()||event.sender!==win.webContents)return {fullscreen:false,maximized:false};
+   return {fullscreen:win.isFullScreen(),maximized:win.isMaximized()};
+ });
+ ipcMain.on('sonora:window-action',(event,action)=>{
+   if(!win||win.isDestroyed()||event.sender!==win.webContents)return;
+   if(action==='close')win.close();
+   else if(action==='minimize'){
+     if(win.isFullScreen()){
+       win.once('leave-full-screen',()=>{if(win&&!win.isDestroyed())win.minimize();});
+       win.setFullScreen(false);
+     }else win.minimize();
+   }else if(action==='exit-fullscreen'&&win.isFullScreen())win.setFullScreen(false);
+   else if(action==='toggle-fullscreen')win.setFullScreen(!win.isFullScreen());
+ });
  ipcMain.handle('sonora:rescan',()=>serializedScan(false));
  ipcMain.handle('sonora:folders',()=>roots);
  ipcMain.handle('sonora:phone-info',()=>publicPhoneInfo());
@@ -370,14 +632,29 @@ app.whenReady().then(async()=>{
  });
  ipcMain.on('sonora:notch-enabled',(event,enabled)=>{
    if(win&&event.sender===win.webContents){
+     const wasEnabled=notchEnabled;
      notchEnabled=Boolean(enabled);
-     if(!notchEnabled&&notchWindow&&!notchWindow.isDestroyed())notchWindow.hide();
+     if(!notchEnabled){
+       stopNativeIsland();
+       if(notchWindow&&!notchWindow.isDestroyed())notchWindow.hide();
+     }else if(!wasEnabled&&!nativeIsland&&(!notchWindow||notchWindow.isDestroyed())){
+       createNotchWindow();
+     }
    }
  });
- ipcMain.on('sonora:notch-action',(event,action)=>{
-   if(!notchWindow||event.sender!==notchWindow.webContents||
-      !['toggle','previous','next'].includes(action))return;
-   if(win&&!win.isDestroyed())win.webContents.send('sonora:media-action',action);
+ ipcMain.on('sonora:notch-action',(event,action,value)=>{
+   if(!notchWindow||event.sender!==notchWindow.webContents)return;
+   if(action==='open'){showMainWindow();return;}
+   if(!win||win.isDestroyed())return;
+   if(action==='seek'){
+     const duration=currentNotchState().duration;
+     if(!Number.isFinite(value)||value<0||!Number.isFinite(duration)||duration<=0)return;
+     win.webContents.send('sonora:phone-command',{
+       action:'seek-mac',position:Math.min(duration,Number(value))
+     });
+   }else if(['toggle','previous','next'].includes(action)){
+     win.webContents.send('sonora:media-action',action);
+   }
  });
  ipcMain.handle('sonora:notch-support',()=>process.platform==='darwin');
 
@@ -395,7 +672,7 @@ app.whenReady().then(async()=>{
  ipcMain.handle('sonora:media-key-status',()=>mediaStatus());
 
  newWindow();
- app.on('activate',()=>{if(!win||win.isDestroyed())newWindow();});
+ app.on('activate',showMainWindow);
 });
 app.on('window-all-closed',()=>{
   updateMediaShortcuts(false);
@@ -408,6 +685,7 @@ app.on('window-all-closed',()=>{
   if(process.platform!=='darwin')app.quit();
 });
 app.on('will-quit',()=>{
+ stopNativeIsland();
  if(notchTimer){clearInterval(notchTimer);notchTimer=null;}
  stopFolderWatchers();globalShortcut.unregisterAll();
  if(playbackPowerBlocker!==null){powerSaveBlocker.stop(playbackPowerBlocker);playbackPowerBlocker=null;}

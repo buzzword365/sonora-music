@@ -9,12 +9,15 @@
     "preview": "vite preview --host 127.0.0.1",
     "desktop:dev": "SONORA_DEV_SERVER=http://127.0.0.1:5173 electron .",
     "desktop": "npm run build && electron .",
-    "app:mac": "npm run build && electron-builder --mac dir --arm64",
+    "app:mac": "npm run build && npm run native:island && electron-builder --mac dir --arm64 && npm run sign:mac",
     "start": "electron .",
     "check": "node --check electron/main.mjs && node --check electron/phone-server.mjs && node --check electron/lyrics.mjs && node --check electron/preload.cjs",
+    "native:island": "sh scripts/build-native-island.sh",
+    "sign:mac": "codesign --force --deep --sign - --timestamp=none \"release/mac-arm64/Sonora Music.app\" && codesign --verify --deep --strict \"release/mac-arm64/Sonora Music.app\"",
+    "test:fullscreen": "node tests/native-fullscreen-policy.test.mjs && node tests/notch-compact-window-policy.test.mjs && node tests/notch-hover-stability.test.mjs && node tests/native-island-state.test.mjs",
     "test:palette": "node tests/palette-regression.mjs",
     "test:e2e": "node tests/adaptive-theme-e2e.mjs",
-    "pack:mac": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64",
+    "pack:mac": "npm run build && npm run native:island && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 && npm run sign:mac",
     "test:playlists": "node tests/playlists-e2e.mjs && node tests/artist-search-e2e.mjs && node tests/playlist-drag-e2e.mjs",
     "test:package": "node tests/playlist-package-smoke.mjs",
     "ios:sync": "npm run build && cap sync ios",
@@ -57,6 +60,9 @@
       "package.json",
       "node_modules/**/*",
       "!tests/**/*"
+    ],
+    "extraResources": [
+      {"from":"native/sonora-island/sonora-island-helper","to":"sonora-island-helper"}
     ],
     "mac": {
       "target": [

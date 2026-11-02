@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import {
   Album, ArrowDownToLine, ArrowLeft, ArrowRight, Check, Disc3, FolderOpen,
   Heart, Home, Library, ListMusic, Menu, MoreHorizontal, Music2, Music4, Pause,
-  Play, Plus, Repeat, Repeat1, Search, Settings2, Shuffle, SkipBack, SkipForward,
+  Play, Plus, Repeat, Repeat1, Search, Settings2, Shuffle, SkipBack, SkipForward, Minimize2, Minus,
   SlidersHorizontal, Sparkles, Sun, Moon, Trash2, UploadCloud, Volume2, VolumeX, X, Headphones, Clock3, HardDrive, Info, GripVertical, ArrowUp, ArrowDown
 } from 'lucide-react';
 import {
@@ -86,6 +86,18 @@ export default function App() {
   const [immersiveOpen,setImmersiveOpen]=useState(false);
   const [notchEnabled,setNotchEnabled]=useState(()=>readSettingShadow('sonora:notch-enabled',true));
   const [notchSupported,setNotchSupported]=useState(false);
+  const [windowFullscreen,setWindowFullscreen]=useState(false);
+  useEffect(()=>{
+    if(!window.sonoraDesktop)return;
+    let mounted=true;
+    const unsubscribe=window.sonoraDesktop.onWindowState(state=>{
+      if(mounted)setWindowFullscreen(Boolean(state.fullscreen));
+    });
+    void window.sonoraDesktop.getWindowState().then(state=>{
+      if(mounted)setWindowFullscreen(Boolean(state.fullscreen));
+    }).catch(()=>{});
+    return ()=>{mounted=false;unsubscribe();};
+  },[]);
   useEffect(()=>{
     if(!window.sonoraDesktop)return;
     window.sonoraDesktop.setNotchEnabled(notchEnabled);
@@ -908,9 +920,17 @@ export default function App() {
       </div>)}
     </div>
   );
-  return <div className={'app '+(dropActive?'dropping':'')} data-appearance={appearanceMode} data-ui-theme={surfaceTheme} style={artworkTheme} onDragOver={e=>{e.preventDefault();setDropActive(true);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDropActive(false);}} onDrop={onDrop}>
+  return <div className={'app '+(dropActive?'dropping':'')+(windowFullscreen?' sonora-fullscreen':'')} data-appearance={appearanceMode} data-ui-theme={surfaceTheme} style={artworkTheme} onDragOver={e=>{e.preventDefault();setDropActive(true);}} onDragLeave={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setDropActive(false);}} onDrop={onDrop}>
     <input className="sr-only" ref={fileInput} type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.aiff" multiple onChange={fileChange}/>
     {dropActive&&<div className="drop-target"><UploadCloud size={42}/><strong>Drop your music here</strong><span>Your tracks stay on this device</span></div>}
+    {!windowFullscreen&&window.sonoraDesktop&&<div className="sonora-window-drag-strip" aria-hidden="true"/>}
+    {windowFullscreen&&window.sonoraDesktop&&<div className="sonora-fs-titlebar" role="group" aria-label="Fullscreen window controls">
+      <div className="sonora-fs-traffic-lights">
+        <button className="sonora-light sonora-light-close" title="Close Sonora" aria-label="Close window" onClick={()=>window.sonoraDesktop?.windowAction('close')}><X size={9}/></button>
+        <button className="sonora-light sonora-light-minimize" title="Minimize Sonora" aria-label="Minimize window" onClick={()=>window.sonoraDesktop?.windowAction('minimize')}><Minus size={10}/></button>
+        <button className="sonora-light sonora-light-expand" title="Exit fullscreen" aria-label="Exit fullscreen" onClick={()=>window.sonoraDesktop?.windowAction('exit-fullscreen')}><Minimize2 size={10}/></button>
+      </div>
+    </div>}
     <aside className={'sidebar '+(sideOpen?'sidebar-open':'')}>
       <div className="logo"><div className="logo-emblem"><span className="logo-bars"><i/><i/><i/><i/></span></div><span>sonora<span className="logo-dot">.</span></span><button className="mobile-close" onClick={()=>setSideOpen(false)}><X/></button></div>
       <div className="nav-group"><div className="nav-label">DISCOVER</div>

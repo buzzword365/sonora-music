@@ -1,35 +1,93 @@
-:root{color-scheme:dark;font-family:Inter,"SF Pro Display",-apple-system,BlinkMacSystemFont,sans-serif;
-  text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}
-*{box-sizing:border-box}
-body{margin:0;padding:6px 7px 7px;background:transparent;overflow:hidden}
-.notch-card{height:104px;position:relative;overflow:hidden;border-radius:26px;
-  background:linear-gradient(135deg,#171a27e9,#242438eb 63%,#1c1b29ee);
-  border:1px solid #f4e8ff36;box-shadow:0 12px 36px #0507119a,inset 0 1px 0 #ffffff32;
-  display:flex;align-items:center;padding:13px 14px;gap:12px;color:#f7f5f9;
-  backdrop-filter:blur(27px) saturate(165%);-webkit-backdrop-filter:blur(27px) saturate(165%)}
-.notch-glow{position:absolute;pointer-events:none;inset:0;
-  background:radial-gradient(ellipse at 88% 0%,#ae83ee1c,transparent 68%);}
-.notch-cover{position:relative;flex:none;width:70px;height:70px;border-radius:14px;overflow:hidden;
-  display:grid;place-items:center;background:linear-gradient(145deg,#8c6bb0,#4d8097);
-  box-shadow:0 5px 16px #0006}
-.notch-cover img{display:none;width:100%;height:100%;object-fit:cover}
-.notch-cover img.visible{display:block}
-.notch-cover img.visible+#cover-placeholder{display:none}
-#cover-placeholder{font-size:29px;color:#e8d3ff}
-.notch-content{position:relative;min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}
-.notch-heading{font-size:9px;letter-spacing:1.4px;font-weight:850;color:#d5aafa}
-.notch-heading span{color:#d3c2d7a3;letter-spacing:.5px;font-size:8px}
-.notch-title{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}
-.notch-artist{font-size:10px;color:#dfd6e5b3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.notch-transport{display:flex;align-items:center;gap:8px;margin-top:3px}
-button{appearance:none;border:none;cursor:pointer;width:27px;height:26px;
-  display:grid;place-items:center;border-radius:10px;background:#ffffff16;color:#f2eef7;
-  transition:background .16s}
-button:hover{background:#ffffff33}
-button:focus-visible{outline:2px solid #d9aeff;outline-offset:1px}
-button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;
-  stroke-linejoin:round;stroke-linecap:round}
-button#toggle{background:#d4b5f1;color:#252032}
-button#toggle:hover{background:#ead6fb}
-button#toggle svg{fill:currentColor;stroke:none}
-button#toggle svg[hidden]{display:none}
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  --accent: #acd1df;
+  --glow: rgba(137, 173, 191, .12);
+  --glass-edge: rgba(250,251,255,.3);
+  --glass-tint: rgba(32,39,57,.35);
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+}
+* { box-sizing: border-box }
+html,body { margin:0; width:100%; height:100%; background:transparent; overflow:hidden }
+body { display:flex; align-items:flex-start; justify-content:center; color:#fff; user-select:none }
+.island {
+  position:relative; width:308px; height:134px; flex:none;
+  transform-origin:50% 0; opacity:0;
+  transform:translateY(-7px) scale(.96);
+  transition: transform .23s cubic-bezier(.22,.83,.26,1),opacity .17s ease;
+}
+body.expanded .island { opacity:1; transform:translateY(0) scale(1) }
+.surface {
+  position:absolute; inset:0; padding:12px 14px 9px; overflow:hidden;
+  border:1px solid var(--glass-edge); border-radius:25px;
+  background:linear-gradient(140deg,rgba(238,242,255,.19),rgba(112,128,158,.16) 40%,var(--glass-tint));
+  -webkit-backdrop-filter:blur(30px) saturate(175%) brightness(1.06);
+  backdrop-filter:blur(30px) saturate(175%) brightness(1.06);
+  box-shadow:0 12px 24px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.32),inset 0 -1px rgba(255,255,255,.1);
+  isolation:isolate;
+}
+.surface::before {
+  content:""; position:absolute;inset:-48px -20px 40% -24px;pointer-events:none;z-index:-1;
+  background:radial-gradient(ellipse at 23% 18%,rgba(244,250,255,.23),transparent 59%),
+  radial-gradient(ellipse at 91% 58%,var(--glow),transparent 63%);
+}
+.surface::after {
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  box-shadow:inset 1px 1px rgba(255,255,255,.22),inset -1px -1px rgba(255,255,255,.04);
+}
+.top-row { display:flex;align-items:center;gap:10px;height:43px;min-width:0 }
+.album {
+  width:42px;height:42px;flex:0 0 42px;position:relative;overflow:hidden;
+  border-radius:10px;background:linear-gradient(135deg,#47385d,#202130);
+  box-shadow:0 2px 9px #0007;
+}
+.album-placeholder {position:absolute;inset:0;display:grid;place-items:center;color:#d4c6e8}
+.album-placeholder svg {width:23px;height:23px}
+.album img {position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.album img.visible {display:block}
+.details {flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.song-name {
+  font-size:12.8px;font-weight:700;letter-spacing:-.12px;line-height:1.2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.artist-name {
+  font-size:10.5px;line-height:1.25;color:rgba(231,231,238,.61);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bars {display:flex;align-items:center;justify-content:center;gap:2px;width:19px;height:17px;flex:0 0 19px;color:var(--accent)}
+.bars i {width:2px;height:6px;background:currentColor;border-radius:7px;animation:meter .8s ease-in-out infinite alternate}
+.bars i:nth-child(2){height:12px;animation-delay:-.34s}
+.bars i:nth-child(3){height:9px;animation-delay:-.17s}
+.bars i:nth-child(4){height:10px;animation-delay:-.48s}
+body:not(.playing) .bars i {animation-play-state:paused;height:4px;opacity:.55}
+@keyframes meter {0%{transform:scaleY(.35)}100%{transform:scaleY(1)}}
+.timeline {display:flex;align-items:center;gap:8px;height:18px;margin-top:7px;min-width:0}
+.time {font-size:9.4px;color:rgba(230,228,240,.62);font-variant-numeric:tabular-nums;letter-spacing:-.05px;width:27px;flex:0 0 27px}
+.remaining {width:33px;flex-basis:33px;text-align:right}
+#seek {flex:1;min-width:0;height:17px;border:0;outline:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:pointer;margin:0}
+#seek::-webkit-slider-runnable-track {
+  height:3px;border-radius:6px;
+  background:linear-gradient(to right,var(--accent) 0%,var(--accent) var(--fill),rgba(255,255,255,.19) var(--fill),rgba(255,255,255,.19) 100%);
+}
+#seek::-webkit-slider-thumb {appearance:none;-webkit-appearance:none;width:8px;height:8px;margin-top:-2.5px;border:0;border-radius:50%;background:#f4f5fa;opacity:0;transition:opacity .12s}
+#seek:hover::-webkit-slider-thumb,#seek:focus-visible::-webkit-slider-thumb{opacity:1}
+#seek:disabled{opacity:.45;cursor:default}
+.action-row {margin-top:6px;display:flex;align-items:center;justify-content:center;height:28px;position:relative}
+button {appearance:none;-webkit-appearance:none;border:0;cursor:pointer;background:transparent;color:rgba(246,245,250,.83);display:grid;place-items:center;padding:0;touch-action:manipulation;transition:background .15s,color .15s,transform .15s}
+button:focus-visible,input:focus-visible {outline:2px solid var(--accent);outline-offset:2px}
+button:active{transform:scale(.91)}
+.transport {display:flex;justify-content:center;align-items:center;gap:8px}
+.transport button {width:27px;height:27px;border-radius:50%}
+.transport button:hover {background:rgba(255,255,255,.09);color:#fff}
+.transport svg {width:17px;height:17px;fill:currentColor}
+.transport .primary {width:32px;height:32px;color:#fff}
+.transport .primary svg {width:20px;height:20px;fill:white}
+.transport .primary:hover {background:rgba(255,255,255,.09)}
+.status {position:absolute;left:0;font-size:8px;letter-spacing:.8px;font-weight:700;color:rgba(222,220,232,.44)}
+.open-app {position:absolute;right:0;width:26px;height:28px;border-radius:6px}
+.open-app svg {width:17px;height:17px}
+.open-app:hover {background:rgba(255,255,255,.09);color:#fff}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after {transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}

@@ -1,6 +1,16 @@
 const {contextBridge,ipcRenderer}=require('electron');
 contextBridge.exposeInMainWorld('sonoraDesktop',Object.freeze({
  isDesktop:true,
+ getWindowState:()=>ipcRenderer.invoke('sonora:window-state'),
+ windowAction:action=>{
+   if(['close','minimize','exit-fullscreen'].includes(action))ipcRenderer.send('sonora:window-action',action);
+ },
+ onWindowState:callback=>{
+   if(typeof callback!=='function')return ()=>{};
+   const listener=(_event,state)=>callback(state);
+   ipcRenderer.on('sonora:window-state',listener);
+   return ()=>ipcRenderer.removeListener('sonora:window-state',listener);
+ },
  chooseMusicFolders:()=>ipcRenderer.invoke('sonora:choose-folders'),
  rescanMusicFolders:()=>ipcRenderer.invoke('sonora:rescan'),
  listMusicFolders:()=>ipcRenderer.invoke('sonora:folders'),

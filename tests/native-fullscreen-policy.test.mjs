@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { FullscreenTransitionGuard } from '../electron/fullscreen-transition.mjs';
+const main=readFileSync(new URL('../electron/main.mjs', import.meta.url),'utf8');
+
+const nativeMain = main.match(/function newWindow\(\)\{([\s\S]*?)win\.webContents\.setWindowOpenHandler/);
+const mini = main.match(/function createNotchWindow\(\)\{([\s\S]*?)notchWindow=new BrowserWindow\(\{([\s\S]*?)\}\);/);
+assert.ok(nativeMain && mini,'Both window constructors must exist');
+assert.match(nativeMain[1],/fullscreenable:true/,'Main Sonora window must create a native fullscreen Space');
+assert.doesNotMatch(nativeMain[1],/fullscreenable:false/,'Main window must never use same-desktop zoom as fullscreen');
+assert.match(mini[2],/fullscreenable:false/,'Floating notch must not become a fullscreen window');
+assert.match(main,/will-enter-full-screen/);
+assert.match(main,/will-leave-full-screen/);
+assert.match(main,/win\.on\('enter-full-screen'/);
+assert.match(main,/win\.on\('leave-full-screen'/);
+assert.match(main,/if\(nativeIsland\)return;/,'Native notch helper should not restart during fullscreen');
+assert.match(main,/if\(win\.isFullScreen\(\)\|\|fullscreenTransition\.suppressesFocus\(\)\)/,'Fallback overlay must be hidden during fullscreen');
+assert.match(main,/if\(fullscreenTransition\.suppressesFocus\(\)&&win/,'Focus-guard must protect fullscreen transition');
+assert.match(main,/else if\(action==='toggle-fullscreen'\)win\.setFullScreen\(!win\.isFullScreen\(\)\)/);
+
+const guard=new FullscreenTransitionGuard();
+assert.equal(guard.suppressesFocus(100),false);
+guard.begin(1000);
+assert.equal(guard.suppressesFocus(1000),true);
+assert.equal(guard.suppressesFocus(3500),true);
+assert.equal(guard.suppressesFocus(7000),false,'Unfinished native transition must recover on failsafe');
+guard.end(7200);
+assert.equal(guard.suppressesFocus(7800),true,'Prevent focus while Space animation settles');
+assert.equal(guard.suppressesFocus(8150),false,'App activation must work normally after transition');
+guard.begin(8200);
+guard.end(8500);
+assert.equal(guard.suppressesFocus(9000),true);
+assert.equal(guard.suppressesFocus(9500),false);
+console.log('PASS: native macOS main fullscreen policy, nonfullscreen auxiliary player, transition focus suppression, fallback recovery, native exit/toggle actions');

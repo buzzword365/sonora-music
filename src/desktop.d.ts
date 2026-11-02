@@ -3,6 +3,9 @@ declare global {
   interface Window {
     sonoraDesktop?: {
       isDesktop: boolean;
+      getWindowState: ()=>Promise<{fullscreen:boolean;maximized:boolean}>;
+      onWindowState: (callback:(state:{fullscreen:boolean;maximized:boolean})=>void)=>()=>void;
+      windowAction: (action:'close'|'minimize'|'exit-fullscreen')=>void;
       chooseMusicFolders: ()=>Promise<{canceled:boolean; tracks:NativeSong[]; roots:string[]}>;
       rescanMusicFolders: ()=>Promise<{tracks:NativeSong[]; roots:string[]}>;
       listMusicFolders: ()=>Promise<string[]>;

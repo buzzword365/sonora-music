@@ -51,3 +51,9 @@ tests/*.log
 
 # Xcode derived simulator output (not native source)
 /ios/build/
+
+# Compiled native island helper must be built on each macOS host.
+/native/sonora-island/sonora-island-helper
+
+# Symlink for local dependency testing (never publish).
+/node_modules

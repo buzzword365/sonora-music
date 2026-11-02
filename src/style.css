@@ -148,3 +148,61 @@
 @media (prefers-reduced-motion: reduce) {
   .radio-wave-emission {display:none!important;animation:none!important}
 }
+
+
+/* macOS fullscreen normally hides the native traffic lights. Keep a slim,
+   accessible replacement visible in Sonora's own chrome while fullscreen. */
+.sonora-fs-titlebar {
+  position:absolute;left:0;right:0;top:0;height:32px;z-index:42;
+  display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb, var(--theme-sidebar, #0e0d15) 94%, transparent);
+  border-bottom:1px solid rgba(208,216,255,.12);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  pointer-events:none;
+}
+.sonora-fs-traffic-lights {
+  position:absolute;left:15px;top:0;height:100%;
+  display:flex;align-items:center;gap:8px;pointer-events:auto;
+}
+.sonora-light {
+  width:13px;height:13px;flex:none;display:grid;place-items:center;
+  padding:0;border-radius:50%;border:1px solid rgba(0,0,0,.20);
+  color:rgba(0,0,0,.62);cursor:pointer;transition:filter .13s,transform .13s;
+}
+.sonora-light svg{opacity:0;stroke-width:2.4}
+.sonora-fs-traffic-lights:hover .sonora-light svg,
+.sonora-light:focus-visible svg {opacity:1}
+.sonora-light:hover {filter:brightness(1.08)}
+.sonora-light:active {transform:scale(.9)}
+.sonora-light-close{background:#ff5f57}
+.sonora-light-minimize{background:#febc2e}
+.sonora-light-expand{background:#28c840}
+.sonora-fs-title{
+  font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:var(--theme-muted,#aeb3cb);
+}
+.app.sonora-fullscreen .sidebar{padding-top:53px}
+.app.sonora-fullscreen .topbar{height:103px;padding-top:31px}
+@media(max-width:770px){
+  .app.sonora-fullscreen .sidebar{padding-top:53px}
+  .app.sonora-fullscreen .topbar{height:91px;padding-top:31px}
+}
+
+
+
+/* Native macOS traffic lights now sit inside Sonora's own top surface.
+   No separate "Sonora Music" title tab; the top area is a native drag zone.
+   Leave 90px clear for the three macOS buttons. */
+.sonora-window-drag-strip {
+  position:fixed;top:0;left:92px;right:0;height:27px;z-index:26;
+  -webkit-app-region:drag;
+}
+.app:not(.sonora-fullscreen) .sidebar {padding-top:40px}
+.app:not(.sonora-fullscreen) .topbar {height:96px;padding-top:18px}
+.app.sonora-fullscreen .sonora-fs-titlebar {
+  background:transparent;border:0;box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+}
+@media(max-width:770px){
+  .app:not(.sonora-fullscreen) .topbar {height:87px;padding-top:18px}
+}
