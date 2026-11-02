@@ -82,6 +82,10 @@ Run `npm run build && npm start` to open the Electron desktop app from a fresh c
 | `tests/` | Synthetic, isolated Electron UI and palette regressions |
 | `dist/` | Generated renderer output (not checked into Git; produced by `npm run build`) |
 
+## Development and releases
+
+Use the [development workflow](docs/DEVELOPMENT_WORKFLOW.md) to identify canonical source and avoid mixing archived builds with live work. Before publishing, follow the [release checklist](docs/RELEASE_CHECKLIST.md). To report security issues, see [Security](SECURITY.md).
+
 ## Privacy and distribution
 
 No personal tracks, album-cover collections, listening history, playlists, account tokens, music-folder indexes, or runtime phone pairing credentials are checked in. The phone companion uses your local network and should only be paired on a network you trust; it is not a remote internet music service. Source files are editable under the repository's MIT licence, subject to third-party notices in [THIRD_PARTY.md](THIRD_PARTY.md).

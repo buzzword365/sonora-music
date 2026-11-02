@@ -2,8 +2,14 @@ node_modules/
 *.asar
 dist-electron/
 release/
+/release-*/
 out/
 build/
+
+# Locally generated native helpers and diagnostic results
+/native/boring-notch-helper/notch-helper
+/native/sonora-island/sonora-island-helper
+/tests/*-results/
 .DS_Store
 .env
 .env.*
