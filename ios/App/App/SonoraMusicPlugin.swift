@@ -14,9 +14,30 @@ public class SonoraMusicPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
         CAPPluginMethod(name: "pick", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "list", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resolveFile", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "removeFile", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "removeFile", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeLoad", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeQueue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativePlay", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativePause", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeSkip", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeSeek", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeVolume", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "nativeState", returnType: CAPPluginReturnPromise)
     ]
     private var pendingCall: CAPPluginCall?
+    private lazy var nativePlayer = SonoraNativePlayer(
+        locate: { [weak self] id in
+            guard let self = self else { return nil }
+            return try? self.safeFile(id)
+        },
+        describe: { [weak self] id in
+            guard let self = self, let url = try? self.safeFile(id) else { return [:] }
+            return self.cachedMetadata(url) ?? self.metadata(url)
+        },
+        emit: { [weak self] state in
+            self?.notifyListeners("sonoraNativeState", data: state)
+        })
+
     private let allowed = Set(["mp3", "m4a", "aac", "wav", "flac", "ogg", "oga", "opus", "aiff", "aif", "mp4"])
     private var storage: URL {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -181,4 +202,66 @@ public class SonoraMusicPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPickerDel
             call.resolve()
         } catch { call.reject(error.localizedDescription) }
     }
+
+    // MARK: Native audio bridge (never routes audio through IndexedDB/WebKit)
+    @objc public func nativeLoad(_ call: CAPPluginCall) {
+        guard let id = call.getString("id") else { call.reject("Missing ID"); return }
+        let time = call.getDouble("time") ?? 0
+        let play = call.getBool("play") ?? true
+        DispatchQueue.main.async {
+            if self.nativePlayer.load(id, time: time, autoplay: play) {
+                call.resolve(self.nativePlayer.state())
+            } else {
+                call.reject("Local audio file missing or invalid")
+            }
+        }
+    }
+    @objc public func nativeQueue(_ call: CAPPluginCall) {
+        let ids = (call.getArray("ids") ?? []).compactMap { $0 as? String }
+        let repeatMode = call.getString("repeat") ?? "off"
+        DispatchQueue.main.async {
+            self.nativePlayer.setQueue(ids, repeatMode: repeatMode)
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativePlay(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.nativePlayer.play()
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativePause(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.nativePlayer.pause()
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativeSkip(_ call: CAPPluginCall) {
+        let direction = call.getInt("direction") ?? 1
+        DispatchQueue.main.async {
+            self.nativePlayer.skip(direction)
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativeSeek(_ call: CAPPluginCall) {
+        guard let time = call.getDouble("time"), time.isFinite else {
+            call.reject("Invalid position"); return
+        }
+        DispatchQueue.main.async {
+            self.nativePlayer.seek(time)
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativeVolume(_ call: CAPPluginCall) {
+        let volume = call.getDouble("volume") ?? 1
+        let muted = call.getBool("muted") ?? false
+        DispatchQueue.main.async {
+            self.nativePlayer.volume(volume, muted: muted)
+            call.resolve(self.nativePlayer.state())
+        }
+    }
+    @objc public func nativeState(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { call.resolve(self.nativePlayer.state()) }
+    }
+
 }

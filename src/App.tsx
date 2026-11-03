@@ -13,7 +13,7 @@ import PlaylistEditor from './PlaylistEditor';
 import RadioWaveButton from './RadioWaveButton';
 import ThemePicker, { type SurfaceTheme } from './ThemePicker';
 import ListeningStatistics from './ListeningStatistics';
-import {isNativeIOS,iosAudioURL,listIOSMusic,pickIOSMusic,removeIOSMusic} from './iosMusic';
+import {isNativeIOS,iosAudioURL,iosPlayback,listIOSMusic,pickIOSMusic,removeIOSMusic, type NativePlaybackState} from './iosMusic';
 import ImmersiveNowPlaying from './ImmersiveNowPlaying';
 import { matchesLibrarySearch } from './librarySearch';
 import { AudioMixer, type EQBands } from './audioMixer';
@@ -47,9 +47,11 @@ const moveSong=(ids:string[],from:string,to:string)=>{
 
 
 function Cover({title,url,size='normal'}:{title:string;url?:string;size?:'normal'|'small'|'large'}) {
+  const [broken,setBroken]=useState(false);
+  useEffect(()=>setBroken(false),[url]);
   const [start,end]=getColors(title);
   return <div className={'cover cover-'+size} style={{background:'linear-gradient(135deg,'+start+','+end+')'}}>
-    {url?<img src={url} alt="" loading="lazy" />:<div className="cover-sheen"><Music2 size={size==='small'?19:size==='large'?76:38} strokeWidth={1.5}/></div>}
+    {url&&!broken?<img src={url} alt="" loading="lazy" onError={()=>setBroken(true)}/>:<div className="cover-sheen"><Music2 size={size==='small'?19:size==='large'?76:38} strokeWidth={1.5}/></div>}
   </div>;
 }
 function NavItem({icon,active,onClick,children}:{icon:ReactNode;active?:boolean;onClick:()=>void;children:ReactNode}) {
@@ -142,6 +144,35 @@ export default function App() {
 
   const nextRef=useRef<(auto:boolean)=>void>(()=>{});
   const wantPlay=useRef(false);
+  const nativeLoadedRef=useRef<string|null>(null);
+  // Background audio and song changes are owned by AVPlayer on iPhone.
+  // WebKit may suspend the renderer, so the native state is authoritative.
+  useEffect(()=>{
+    if(!isNativeIOS)return;
+    let active=true;
+    let dispose:(()=>void)|null=null;
+    const sync=(state:NativePlaybackState)=>{
+      if(!active)return;
+      nativeLoadedRef.current=state.id||null;
+      setPlaying(Boolean(state.playing));
+      setTime(Number.isFinite(state.time)?state.time:0);
+      if(Number.isFinite(state.duration)&&state.duration>0)setDuration(state.duration);
+      if(state.id)setCurrentId('ios-'+state.id);
+    };
+    void iosPlayback.listen(sync).then(handle=>{
+      if(!active)void handle.remove();
+      else dispose=()=>{void handle.remove();};
+    }).catch(e=>setError('Native playback controls unavailable: '+String(e)));
+    const refreshNative=()=>{if(document.visibilityState==='visible')void iosPlayback.state().then(sync).catch(()=>{});};
+    document.addEventListener('visibilitychange',refreshNative);
+    void iosPlayback.state().then(sync).catch(()=>{});
+    return()=>{
+      active=false;
+      document.removeEventListener('visibilitychange',refreshNative);
+      dispose?.();
+    };
+  },[]);
+
   // Resume a previous position only for the song restored on initial app launch.
   // Explicitly switching tracks must ALWAYS start at 0.
   const startupResumeTrackRef=useRef<string|null>(null);
@@ -327,6 +358,13 @@ export default function App() {
   const artworkTheme=useArtworkTheme(current?.cover,appearanceMode);
   const mixes=useMemo(()=>createMixes(tracks,new Date(mixClock)),[tracks,mixClock]);
   const activeIds=queue.filter(id=>tracks.some(t=>t.id===id));
+  useEffect(()=>{
+    if(!isNativeIOS||!libraryReady)return;
+    const ids=activeIds.map(id=>tracks.find(t=>t.id===id)?.iosFileId)
+      .filter((id):id is string=>Boolean(id));
+    void iosPlayback.queue(ids,repeat).catch(e=>setError('Could not update native queue: '+String(e)));
+  },[libraryReady,queue.join('|'),tracks.length,repeat]);
+
   const saveQueue=(ids:string[])=>{
     const next=ids.slice();
     // localStorage is synchronous; IndexedDB remains the structured source.
@@ -346,6 +384,13 @@ export default function App() {
     }
     mixer.cancelFade();pendingFadeRef.current=null;
     wantPlay.current=true;
+    if(isNativeIOS){
+      const song=tracks.find(t=>t.id===id);
+      if(id===currentId&&song?.iosFileId){
+        void iosPlayback.load(song.iosFileId,true).catch(e=>setError('Cannot start this song: '+String(e)));
+      }else if(id!==currentId)setCurrentId(id);
+      return;
+    }
     void mixer.unlock().catch(e=>setError('Audio engine failed: '+String(e)));
     if(id===currentId) {
       audioRef.current?.play().catch(()=>setError('Playback was blocked. Press play again to start.'));
@@ -390,6 +435,11 @@ export default function App() {
     else playMix(songs,scope);
   };
   const nextSong=(auto=false)=>{
+    if(isNativeIOS){
+      wantPlay.current=true;
+      void iosPlayback.skip(1).catch(e=>setError('Could not skip: '+String(e)));
+      return;
+    }
     if(mixer.isCrossfading && auto)return;
     startupResumeTrackRef.current=null;
     if(mixer.isCrossfading || pendingFadeRef.current){mixer.cancelFade();pendingFadeRef.current=null;}
@@ -406,6 +456,11 @@ export default function App() {
   };
   nextRef.current=nextSong;
   const previousSong=()=>{
+    if(isNativeIOS){
+      wantPlay.current=true;
+      void iosPlayback.skip(-1).catch(e=>setError('Could not go back: '+String(e)));
+      return;
+    }
     startupResumeTrackRef.current=null;
     if(mixer.isCrossfading || pendingFadeRef.current){mixer.cancelFade();pendingFadeRef.current=null;}
     const audio=audioRef.current;
@@ -414,6 +469,17 @@ export default function App() {
     if(i>0){wantPlay.current=true;setCurrentId(activeIds[i-1]);} else if(audio)audio.currentTime=0;
   };
   const togglePlay=()=>{
+    if(isNativeIOS){
+      if(!currentId){
+        if(tracks.length)startSong(tracks[0].id,tracks.map(t=>t.id));
+        else chooseMusic();
+        return;
+      }
+      wantPlay.current=!playing;
+      const operation=playing?iosPlayback.pause():iosPlayback.play();
+      void operation.catch(e=>setError('Native playback failed: '+String(e)));
+      return;
+    }
     const audio=audioRef.current;if(!audio)return;
     if(!currentId){
       if(tracks.length)startSong(tracks[0].id,tracks.map(t=>t.id));
@@ -430,6 +496,7 @@ export default function App() {
     }
   };
   beginFadeRef.current=(a)=>{
+    if(isNativeIOS)return;
     if(fadeSeconds<=0||!playing||!currentId||repeat==='one'||mixer.isCrossfading||pendingFadeRef.current)return;
     const remaining=(a.duration||duration)-a.currentTime;
     if(!Number.isFinite(remaining)||remaining>fadeSeconds+.2||remaining<=.4)return;
@@ -540,6 +607,7 @@ export default function App() {
     navigator.mediaSession.playbackState=currentId?(playing?'playing':'paused'):'none';
   },[currentId,playing]);
   useEffect(()=>{
+    if(isNativeIOS)return;
     const a=audioRef.current;if(!a)return;
     const tick=()=>{
       const seconds=a.currentTime;
@@ -577,7 +645,7 @@ export default function App() {
     setTime(0);
     setDuration(tracks.find(t=>t.id===currentId)?.duration||0);
     void setPref('currentId',currentId);
-    if(!currentId){mixer.loadCurrent('');return;}
+    if(!currentId){if(!isNativeIOS)mixer.loadCurrent('');return;}
     if(fadeHandoffRef.current===currentId){
       fadeHandoffRef.current=null;
       setTime(audio.currentTime);
@@ -587,7 +655,7 @@ export default function App() {
     void (async()=>{
       try {
         const selected=tracks.find(t=>t.id===currentId);
-        const position=startupResume?await getPref('position:'+currentId,0):0;
+        const position=startupResume?await getPref('position:'+currentId,0).catch(()=>0):0;
         if(closed)return;
         // If an interrupted session is reopened, allow a one-time resume only
         // when the saved position isn't near the very end of the song.
@@ -604,6 +672,30 @@ export default function App() {
           applyStartupPosition=seek;
           audio.addEventListener('loadedmetadata',seek,{once:true});
           removeSeekListener=()=>audio.removeEventListener('loadedmetadata',seek);
+        }
+        if(isNativeIOS&&selected?.iosFileId){
+          // Same native track can continue playing even after WebKit reloads.
+          // Never restart or pause it solely because the UI remounted.
+          if(nativeLoadedRef.current!==selected.iosFileId){
+            nativeLoadedRef.current=selected.iosFileId;
+            try{
+              const state=await iosPlayback.load(selected.iosFileId,wantPlay.current,position);
+              if(!closed){
+                setPlaying(Boolean(state.playing));
+                setTime(state.time||0);
+                setDuration(state.duration||selected.duration||0);
+              }
+              if(wantPlay.current&&!privateMode&&!closed){
+                void recordTrackPlay(currentId).then(result=>{
+                  if(result&&!closed)setTracks(old=>old.map(t=>t.id===currentId?{...t,...result}:t));
+                }).catch(()=>{});
+              }
+            }catch(e){
+              nativeLoadedRef.current=null;
+              throw e;
+            }
+          }
+          return;
         }
         if(selected?.nativeId && window.sonoraDesktop){
           mixer.loadCurrent('sonora-app://localhost/stream/'+selected.nativeId);
@@ -640,11 +732,13 @@ export default function App() {
     };
   },[currentId,libraryReady]);
   useEffect(()=>{
-    mixer.setVolume(volume,muted);
-    void setPref('volume',volume);
+    if(isNativeIOS){
+      void iosPlayback.volume(volume,muted).catch(()=>{});
+    }else mixer.setVolume(volume,muted);
+    void setPref('volume',volume).catch(()=>{});
   },[volume,muted]);
   useEffect(()=>{
-    if(!('mediaSession' in navigator)||!current)return;
+    if(isNativeIOS||!('mediaSession' in navigator)||!current)return;
     navigator.mediaSession.metadata=new MediaMetadata({
       title:current.title,artist:current.artist,album:current.album,
       artwork:covers[current.id]?[{src:covers[current.id]}]:[]
@@ -1167,7 +1261,12 @@ export default function App() {
         <button aria-label={playing?'Pause':'Play'} className="main-play" onClick={togglePlay}>{playing?<Pause size={20} fill="currentColor"/>:<Play size={20} fill="currentColor"/>}</button>
         <button aria-label="Next" className="control-btn" onClick={()=>nextRef.current(false)}><SkipForward size={21} fill="currentColor"/></button>
         <button aria-label="Repeat" title={'Repeat: '+repeat} className={'control-btn '+(repeat!=='off'?'engaged':'')} onClick={()=>setRepeat(repeat==='off'?'all':repeat==='all'?'one':'off')}>{repeat==='one'?<Repeat1 size={18}/>:<Repeat size={18}/>}</button>
-      </div><div className="seekbar"><span>{shortTime(time)}</span><input type="range" aria-label="Seek" min="0" max={Math.max(1,duration)} step="0.1" value={Math.min(time,Math.max(1,duration))} style={{'--fill':duration>0?(time/duration*100)+'%':'0%'} as React.CSSProperties} onChange={e=>{if(audioRef.current)audioRef.current.currentTime=Number(e.target.value);setTime(Number(e.target.value));}}/><span>{shortTime(duration)}</span></div></div>
+      </div><div className="seekbar"><span>{shortTime(time)}</span><input type="range" aria-label="Seek" min="0" max={Math.max(1,duration)} step="0.1" value={Math.min(time,Math.max(1,duration))} style={{'--fill':duration>0?(time/duration*100)+'%':'0%'} as React.CSSProperties} onChange={e=>{
+        const next=Number(e.target.value);
+        if(isNativeIOS)void iosPlayback.seek(next).catch(e=>setError('Seek failed: '+String(e)));
+        else if(audioRef.current)audioRef.current.currentTime=next;
+        setTime(next);
+      }}/><span>{shortTime(duration)}</span></div></div>
       <div className="player-right"><button title="Open immersive Now Playing" aria-label="Expand Now Playing" className="control-btn" onClick={()=>setImmersiveOpen(true)}><Music4 size={19}/></button><button title="Lyrics" className="control-btn" onClick={()=>setLyricsOpen(true)}>♫</button>
         <button title="Play queue" className={'control-btn '+(showQueue?'engaged':'')} onClick={()=>setShowQueue(!showQueue)}><ListMusic size={21}/></button>
         <button aria-label={muted?'Unmute':'Mute'} className="control-btn" onClick={()=>setMuted(!muted)}>{muted?<VolumeX size={20}/>:<Volume2 size={20}/>}</button><input aria-label="Volume" type="range" min="0" max="1" step=".01" value={muted?0:volume} style={{'--fill':(muted?0:volume*100)+'%'} as React.CSSProperties} onChange={e=>{const next=Number(e.target.value);writeSettingShadow('sonora:volume-shadow',next);setMuted(false);setVolume(next);}}/><button className="mini-status" onClick={()=>open('settings')}><span className="green-light"/> LOCAL</button>

@@ -1,4 +1,4 @@
-import { openDB, type DBSchema } from 'idb';
+import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import { parseBlob } from 'music-metadata';
 
 export type Track = {
@@ -12,7 +12,7 @@ export type NativeSong = {
   size:number; mtimeMs:number; coverBase64?:string; coverMime?:string;
 };
 export async function upsertNativeTracks(rows:NativeSong[]) {
-  const db=await dbp;
+  return useDB(async db=>{
   // Keep explicit user removals hidden across automatic updates and rescans.
   const ignored=new Set((await db.get('prefs','ignoredNativeTrackIds') as string[]|undefined)||[]);
   for (const r of rows) {
@@ -35,11 +35,12 @@ export async function upsertNativeTracks(rows:NativeSong[]) {
       playedAt:old?.playedAt,playCount:old?.playCount,liked:old?.liked||false,cover,mime,nativeId:r.id,nativePath:r.path};
     await db.put('tracks',updated);
   }
+  });
 }
 /** Native iOS audio copies live in Documents/SonoraAudio, not IndexedDB blobs.
  * Reconcile native files into IndexedDB metadata without wiping user edits. */
 export async function upsertIOSTracks(rows:import('./iosMusic').IOSMusicFile[]){
-  const db=await dbp;
+  return useDB(async db=>{
   for(const r of rows){
     const id='ios-'+r.id;
     const old=await db.get('tracks',id);
@@ -61,6 +62,7 @@ export async function upsertIOSTracks(rows:import('./iosMusic').IOSMusicFile[]){
       cover,mime};
     await db.put('tracks',track);
   }
+  });
 }
 export type Playlist = { id: string; name: string; trackIds: string[]; createdAt: number };
 interface MusicDB extends DBSchema {
@@ -69,41 +71,71 @@ interface MusicDB extends DBSchema {
   playlists: { key: string; value: Playlist };
   prefs: { key: string; value: unknown };
 }
-const dbp = openDB<MusicDB>('sonora-local-v1', 1, {
-  upgrade(db) {
-    db.createObjectStore('tracks', { keyPath: 'id' });
-    db.createObjectStore('audio');
-    db.createObjectStore('playlists', { keyPath: 'id' });
-    db.createObjectStore('prefs');
+// WKWebView may terminate its IndexedDB backing process when iOS backgrounds
+// the app. Never reuse a connection after InvalidStateError/closing.
+let dbPromise: Promise<IDBPDatabase<MusicDB>> | null = null;
+function connect(): Promise<IDBPDatabase<MusicDB>> {
+  if(!dbPromise)dbPromise=openDB<MusicDB>('sonora-local-v1',1,{
+    upgrade(db){
+      if(!db.objectStoreNames.contains('tracks'))db.createObjectStore('tracks',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('audio'))db.createObjectStore('audio');
+      if(!db.objectStoreNames.contains('playlists'))db.createObjectStore('playlists',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('prefs'))db.createObjectStore('prefs');
+    },
+    blocking(){dbPromise=null;},
+    terminated(){dbPromise=null;}
+  }).catch(error=>{dbPromise=null;throw error;});
+  return dbPromise;
+}
+function connectionLost(error:unknown):boolean {
+  const message=String(error);
+  return /InvalidStateError|connection is closing|database is closed|connection.*lost|IDBDatabase.*closing/i.test(message);
+}
+async function useDB<T>(operation:(db:IDBPDatabase<MusicDB>)=>Promise<T>):Promise<T>{
+  for(let attempt=0;attempt<2;attempt++){
+    const pending=connect();
+    let database:IDBPDatabase<MusicDB>|undefined;
+    try {
+      database=await pending;
+      return await operation(database);
+    }catch(error){
+      if(!connectionLost(error)||attempt>0)throw error;
+      try {database?.close();}catch{}
+      if(dbPromise===pending)dbPromise=null;
+    }
   }
-});
-export async function allTracks() { return (await (await dbp).getAll('tracks')).sort((a,b) => b.addedAt-a.addedAt); }
-export async function allPlaylists() { return (await (await dbp).getAll('playlists')).sort((a,b)=>a.createdAt-b.createdAt); }
-export async function audioBlob(id:string) { return (await dbp).get('audio',id); }
-export async function updateTrack(track:Track) { await (await dbp).put('tracks',track); }
+  throw new Error('Unable to reopen Sonora music database.');
+}
+export async function allTracks() { return (await useDB(db=>db.getAll('tracks'))).sort((a,b)=>b.addedAt-a.addedAt); }
+export async function allPlaylists() { return (await useDB(db=>db.getAll('playlists'))).sort((a,b)=>a.createdAt-b.createdAt); }
+export async function audioBlob(id:string) { return useDB(db=>db.get('audio',id)); }
+export async function updateTrack(track:Track) { await useDB(db=>db.put('tracks',track)); }
 /** Increment a play start against the latest persisted row, without replacing
  * concurrent edits (likes, title corrections, metadata) with a stale snapshot. */
 export async function recordTrackPlay(id:string):Promise<{playedAt:number;playCount:number}|null> {
-  const db=await dbp,tx=db.transaction('tracks','readwrite');
+  return useDB(async db=>{
+  const tx=db.transaction('tracks','readwrite');
   const track=await tx.store.get(id);
   if(!track){await tx.done;return null;}
   const playedAt=Date.now(),playCount=(track.playCount||0)+1;
   await tx.store.put({...track,playedAt,playCount});
   await tx.done;
   return {playedAt,playCount};
+  });
 }
-export async function putPlaylist(playlist:Playlist) { await (await dbp).put('playlists',playlist); }
-export async function deletePlaylist(id:string) { await (await dbp).delete('playlists',id); }
-export async function getPref<T>(key:string, fallback:T):Promise<T> { const v=await (await dbp).get('prefs',key); return v === undefined ? fallback : v as T; }
-export async function setPref(key:string,value:unknown) { await (await dbp).put('prefs',value,key); }
+export async function putPlaylist(playlist:Playlist) { await useDB(db=>db.put('playlists',playlist)); }
+export async function deletePlaylist(id:string) { await useDB(db=>db.delete('playlists',id)); }
+export async function getPref<T>(key:string, fallback:T):Promise<T> { const v=await useDB(db=>db.get('prefs',key)); return v === undefined ? fallback : v as T; }
+export async function setPref(key:string,value:unknown) { await useDB(db=>db.put('prefs',value,key)); }
 export async function hiddenNativeTrackCount() {
-  return ((await (await dbp).get('prefs','ignoredNativeTrackIds') as string[]|undefined)||[]).length;
+  return ((await useDB(db=>db.get('prefs','ignoredNativeTrackIds')) as string[]|undefined)||[]).length;
 }
 export async function restoreHiddenNativeTracks() {
-  await (await dbp).put('prefs',[],'ignoredNativeTrackIds');
+  await useDB(db=>db.put('prefs',[],'ignoredNativeTrackIds'));
 }
 export async function removeTrack(id:string) {
-  const db=await dbp, tx=db.transaction(['tracks','audio','playlists','prefs'],'readwrite');
+  return useDB(async db=>{
+  const tx=db.transaction(['tracks','audio','playlists','prefs'],'readwrite');
   if(id.startsWith('native-')){
     const old=((await tx.objectStore('prefs').get('ignoredNativeTrackIds') as string[]|undefined)||[]);
     if(!old.includes(id))await tx.objectStore('prefs').put([...old,id],'ignoredNativeTrackIds');
@@ -112,6 +144,7 @@ export async function removeTrack(id:string) {
   const playlists=await tx.objectStore('playlists').getAll();
   for(const p of playlists) if(p.trackIds.includes(id)) await tx.objectStore('playlists').put({...p,trackIds:p.trackIds.filter(t=>t!==id)});
   await tx.done;
+  });
 }
 const validExt = /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus|aiff|aif|mp4)$/i;
 export function supportedFile(file:File) { return validExt.test(file.name) || file.type.startsWith('audio/'); }
@@ -129,9 +162,12 @@ export async function importOne(file:File, seen:Set<string>):Promise<'added'|'du
   } catch { /* Filename fallback when metadata is malformed or unavailable. */ }
   const track:Track={id:crypto.randomUUID(),title,artist,album,duration,cover,size:file.size,filename:file.name,
     fingerprint,addedAt:Date.now(),liked:false,mime:file.type||'application/octet-stream'};
-  const db=await dbp, tx=db.transaction(['tracks','audio'],'readwrite');
+  await useDB(async db=>{
+  const tx=db.transaction(['tracks','audio'],'readwrite');
   await tx.objectStore('tracks').put(track);
   await tx.objectStore('audio').put(file,track.id);
-  await tx.done; seen.add(fingerprint);
+  await tx.done;
+  });
+  seen.add(fingerprint);
   return 'added';
 }
