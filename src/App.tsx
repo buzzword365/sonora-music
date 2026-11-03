@@ -47,9 +47,11 @@ const moveSong=(ids:string[],from:string,to:string)=>{
 
 
 function Cover({title,url,size='normal'}:{title:string;url?:string;size?:'normal'|'small'|'large'}) {
+  const [broken,setBroken]=useState(false);
+  useEffect(()=>setBroken(false),[url]);
   const [start,end]=getColors(title);
   return <div className={'cover cover-'+size} style={{background:'linear-gradient(135deg,'+start+','+end+')'}}>
-    {url?<img src={url} alt="" loading="lazy" />:<div className="cover-sheen"><Music2 size={size==='small'?19:size==='large'?76:38} strokeWidth={1.5}/></div>}
+    {url&&!broken?<img src={url} alt="" loading="lazy" onError={()=>setBroken(true)}/>:<div className="cover-sheen"><Music2 size={size==='small'?19:size==='large'?76:38} strokeWidth={1.5}/></div>}
   </div>;
 }
 function NavItem({icon,active,onClick,children}:{icon:ReactNode;active?:boolean;onClick:()=>void;children:ReactNode}) {
