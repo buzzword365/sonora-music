@@ -13,6 +13,8 @@ export class AudioMixer {
   private sub:BiquadFilterNode|null = null;
   private middle:BiquadFilterNode|null = null;
   private high:BiquadFilterNode|null = null;
+  private dry:GainNode|null = null;
+  private protectedGain:GainNode|null = null;
   private eqEnabled=false;
   private eq:EQBands={bass:0,mid:0,treble:0};
   private volume=.76;
@@ -39,8 +41,13 @@ export class AudioMixer {
       const compressor=ctx.createDynamicsCompressor();
       compressor.threshold.value=-4;compressor.knee.value=2;
       compressor.ratio.value=12;compressor.attack.value=.003;compressor.release.value=.18;
-      low.connect(sub);sub.connect(mid);mid.connect(high);high.connect(compressor);compressor.connect(ctx.destination);
-      this.low=low;this.sub=sub;this.middle=mid;this.high=high;
+      // Flat/off EQ follows the uncompressed path; boosted EQ uses the protective compressor.
+      const dry=ctx.createGain(),protectedGain=ctx.createGain();
+      dry.gain.value=1;protectedGain.gain.value=0;
+      low.connect(sub);sub.connect(mid);mid.connect(high);
+      high.connect(dry);dry.connect(ctx.destination);
+      high.connect(compressor);compressor.connect(protectedGain);protectedGain.connect(ctx.destination);
+      this.low=low;this.sub=sub;this.middle=mid;this.high=high;this.dry=dry;this.protectedGain=protectedGain;
       for(const deck of [this.first,this.second]){
         const source=ctx.createMediaElementSource(deck);
         const gain=ctx.createGain();
@@ -57,9 +64,12 @@ export class AudioMixer {
     this.eqEnabled=enabled;this.eq=values;this.applyEQ();
   }
   private applyEQ(){
-    if(!this.ctx||!this.low||!this.sub||!this.middle||!this.high)return;
+    if(!this.ctx||!this.low||!this.sub||!this.middle||!this.high||!this.dry||!this.protectedGain)return;
     const t=this.ctx.currentTime;
     const levels=this.eqEnabled?this.eq:{bass:0,mid:0,treble:0};
+    const boosted=this.eqEnabled&&[levels.bass,levels.mid,levels.treble].some(value=>value>0);
+    this.dry.gain.setTargetAtTime(boosted?0:1,t,.02);
+    this.protectedGain.gain.setTargetAtTime(boosted?1:0,t,.02);
     for(const [node,gain] of [[this.low,levels.bass],[this.sub,Math.max(0,levels.bass)*.3],[this.middle,levels.mid],[this.high,levels.treble]] as const)
       node.gain.setTargetAtTime(gain,t,.04);
   }
