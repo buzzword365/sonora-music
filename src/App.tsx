@@ -304,7 +304,7 @@ export default function App() {
       const shadowEq=readSettingShadow('sonora:eq-shadow',bands);
       const restoredEq=shadowEq&&['bass','mid','treble'].every(k=>{
         const value=shadowEq[k as keyof EQBands];
-        return typeof value==='number'&&Number.isFinite(value)&&value>=-12&&value<=12;
+        return typeof value==='number'&&Number.isFinite(value)&&value>=-12&&value<=15;
       })?shadowEq:bands;
       const shadowEnabled=readSettingShadow('sonora:eq-enabled-shadow',enabled);
       const restoredEnabled=typeof shadowEnabled==='boolean'?shadowEnabled:enabled;
@@ -1083,12 +1083,12 @@ export default function App() {
               {mediaKeyStatus&&<p className="media-key-info" data-testid="media-key-status">Registered native keys: {mediaKeyStatus.registered.length}/3. Accessibility: {mediaKeyStatus.accessibilityTrusted?'allowed':'not granted'}. {mediaKeyStatus.hasActiveTrack?'A track is selected.':'Choose a track to activate native shortcuts.'} {mediaKeyStatus.registered.length!==3?'If needed, enable Sonora Music under System Settings → Privacy & Security → Accessibility, then reopen Sonora. macOS or another player can reserve these keys.':''}</p>}
             </div></div>}
             <div className="setting-card"><div className="setting-icon"><SlidersHorizontal size={24}/></div><div className="sound-settings">
-              <h3>Sound settings</h3><p>Shape your sound with a three-band equaliser, and overlap consecutive tracks with an adjustable crossfade.</p>
+              <h3>Sound settings</h3><p>Shape your sound with a stronger low-bass equaliser, and overlap consecutive tracks with an adjustable crossfade. Bass boost and Deep bass add extra punch; start at a moderate volume.</p>
               <label className="setting-toggle"><input type="checkbox" checked={equalizerEnabled} onChange={e=>{writeSettingShadow('sonora:eq-enabled-shadow',e.target.checked);setEqualizerEnabled(e.target.checked);}}/> Enable equaliser</label>
-              <div className="eq-presets">{[{name:'Flat',bass:0,mid:0,treble:0},{name:'Warm',bass:4,mid:0,treble:2},{name:'Bass boost',bass:7,mid:-1,treble:1},{name:'Vocal',bass:-2,mid:5,treble:2}].map(preset=>
+              <div className="eq-presets">{[{name:'Flat',bass:0,mid:0,treble:0},{name:'Warm',bass:4,mid:0,treble:2},{name:'Bass boost',bass:10,mid:-2,treble:1},{name:'Deep bass',bass:14,mid:-3,treble:1},{name:'Vocal',bass:-2,mid:5,treble:2}].map(preset=>
                 <button className="outline-button" key={preset.name} onClick={()=>{const next={bass:preset.bass,mid:preset.mid,treble:preset.treble};writeSettingShadow('sonora:eq-shadow',next);writeSettingShadow('sonora:eq-enabled-shadow',true);setEq(next);setEqualizerEnabled(true);}}>{preset.name}</button>)}</div>
               <div className="eq-grid">{(['bass','mid','treble'] as const).map(band=><label key={band}><span>{band.charAt(0).toUpperCase()+band.slice(1)}</span><strong>{eq[band]>0?'+':''}{eq[band]} dB</strong>
-                <input aria-label={band+' equalizer'} type="range" min="-12" max="12" value={eq[band]} step="1" disabled={!equalizerEnabled}
+                <input aria-label={band+' equalizer'} type="range" min="-12" max={band==='bass'?15:12} value={eq[band]} step="1" disabled={!equalizerEnabled}
                   onChange={e=>{const next={...eq,[band]:Number(e.target.value)};writeSettingShadow('sonora:eq-shadow',next);setEq(next);}}/></label>)}</div>
               <label className="fade-setting"><span>Crossfade duration</span><strong>{fadeSeconds===0?'Off':fadeSeconds+' seconds'}</strong>
                 <input aria-label="Crossfade duration" type="range" min="0" max="8" step="1" value={fadeSeconds} onChange={e=>{const next=Number(e.target.value);writeSettingShadow('sonora:fade-shadow',next);setFadeSeconds(next);}}/></label>

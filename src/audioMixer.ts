@@ -10,6 +10,7 @@ export class AudioMixer {
   private ctx:AudioContext|null = null;
   private gains = new Map<HTMLAudioElement,GainNode>();
   private low:BiquadFilterNode|null = null;
+  private sub:BiquadFilterNode|null = null;
   private middle:BiquadFilterNode|null = null;
   private high:BiquadFilterNode|null = null;
   private eqEnabled=false;
@@ -28,12 +29,18 @@ export class AudioMixer {
     if(!this.ctx){
       const ctx=new AudioContext();
       this.ctx=ctx;
-      const low=ctx.createBiquadFilter(),mid=ctx.createBiquadFilter(),high=ctx.createBiquadFilter();
-      low.type='lowshelf';low.frequency.value=190;
+      const low=ctx.createBiquadFilter(),sub=ctx.createBiquadFilter(),mid=ctx.createBiquadFilter(),high=ctx.createBiquadFilter();
+      low.type='lowshelf';low.frequency.value=160;
+      // Add controlled low-bass punch without excessively boosting the vocal range.
+      sub.type='peaking';sub.frequency.value=65;sub.Q.value=.85;
       mid.type='peaking';mid.frequency.value=1000;mid.Q.value=.8;
       high.type='highshelf';high.frequency.value=4200;
-      low.connect(mid);mid.connect(high);high.connect(ctx.destination);
-      this.low=low;this.middle=mid;this.high=high;
+      // Peak compression reduces overload risk at high positive EQ settings.
+      const compressor=ctx.createDynamicsCompressor();
+      compressor.threshold.value=-4;compressor.knee.value=2;
+      compressor.ratio.value=12;compressor.attack.value=.003;compressor.release.value=.18;
+      low.connect(sub);sub.connect(mid);mid.connect(high);high.connect(compressor);compressor.connect(ctx.destination);
+      this.low=low;this.sub=sub;this.middle=mid;this.high=high;
       for(const deck of [this.first,this.second]){
         const source=ctx.createMediaElementSource(deck);
         const gain=ctx.createGain();
@@ -50,10 +57,10 @@ export class AudioMixer {
     this.eqEnabled=enabled;this.eq=values;this.applyEQ();
   }
   private applyEQ(){
-    if(!this.ctx||!this.low||!this.middle||!this.high)return;
+    if(!this.ctx||!this.low||!this.sub||!this.middle||!this.high)return;
     const t=this.ctx.currentTime;
     const levels=this.eqEnabled?this.eq:{bass:0,mid:0,treble:0};
-    for(const [node,gain] of [[this.low,levels.bass],[this.middle,levels.mid],[this.high,levels.treble]] as const)
+    for(const [node,gain] of [[this.low,levels.bass],[this.sub,Math.max(0,levels.bass)*.3],[this.middle,levels.mid],[this.high,levels.treble]] as const)
       node.gain.setTargetAtTime(gain,t,.04);
   }
   setVolume(value:number,muted:boolean){
