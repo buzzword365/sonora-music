@@ -15,6 +15,7 @@ export class AudioMixer {
   private high:BiquadFilterNode|null = null;
   private dry:GainNode|null = null;
   private protectedGain:GainNode|null = null;
+  private makeupGain:GainNode|null = null;
   private eqEnabled=false;
   private eq:EQBands={bass:0,mid:0,treble:0};
   private volume=.76;
@@ -41,6 +42,10 @@ export class AudioMixer {
       const compressor=ctx.createDynamicsCompressor();
       compressor.threshold.value=-9;compressor.knee.value=3;
       compressor.ratio.value=16;compressor.attack.value=.002;compressor.release.value=.2;
+      // Makeup gain restores loudness after the intentionally heavy compressor.
+      // It feeds the final soft limiter, rather than boosting the device output.
+      const makeupGain=ctx.createGain();
+      makeupGain.gain.value=1;
       // The nonlinear soft-clipper adds perceived bass harmonics while bounding
       // extreme peaks. Oversampling reduces distortion artifacts.
       const saturator=ctx.createWaveShaper();
@@ -55,8 +60,8 @@ export class AudioMixer {
       dry.gain.value=1;protectedGain.gain.value=0;
       low.connect(sub);sub.connect(mid);mid.connect(high);
       high.connect(dry);dry.connect(ctx.destination);
-      high.connect(compressor);compressor.connect(saturator);saturator.connect(protectedGain);protectedGain.connect(ctx.destination);
-      this.low=low;this.sub=sub;this.middle=mid;this.high=high;this.dry=dry;this.protectedGain=protectedGain;
+      high.connect(compressor);compressor.connect(makeupGain);makeupGain.connect(saturator);saturator.connect(protectedGain);protectedGain.connect(ctx.destination);
+      this.low=low;this.sub=sub;this.middle=mid;this.high=high;this.dry=dry;this.protectedGain=protectedGain;this.makeupGain=makeupGain;
       for(const deck of [this.first,this.second]){
         const source=ctx.createMediaElementSource(deck);
         const gain=ctx.createGain();
@@ -73,13 +78,15 @@ export class AudioMixer {
     this.eqEnabled=enabled;this.eq=values;this.applyEQ();
   }
   private applyEQ(){
-    if(!this.ctx||!this.low||!this.sub||!this.middle||!this.high||!this.dry||!this.protectedGain)return;
+    if(!this.ctx||!this.low||!this.sub||!this.middle||!this.high||!this.dry||!this.protectedGain||!this.makeupGain)return;
     const t=this.ctx.currentTime;
     const levels=this.eqEnabled?this.eq:{bass:0,mid:0,treble:0};
     const boosted=this.eqEnabled&&[levels.bass,levels.mid,levels.treble].some(value=>value>0);
     this.dry.gain.setTargetAtTime(boosted?0:1,t,.02);
-    // Leave peak headroom after waveshaping; do not increase device volume.
-    this.protectedGain.gain.setTargetAtTime(boosted?.86:0,t,.02);
+    // Apply graduated makeup gain so extreme bass retains the same punchy
+    // perceived loudness. Soft limiting after makeup bounds sample peaks.
+    this.makeupGain.gain.setTargetAtTime(boosted?Math.min(2.4,1+Math.max(0,levels.bass)*.06):1,t,.03);
+    this.protectedGain.gain.setTargetAtTime(boosted?.96:0,t,.02);
     for(const [node,gain] of [[this.low,levels.bass],[this.sub,Math.max(0,levels.bass)*.42],[this.middle,levels.mid],[this.high,levels.treble]] as const)
       node.gain.setTargetAtTime(gain,t,.04);
   }

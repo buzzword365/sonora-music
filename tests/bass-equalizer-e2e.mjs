@@ -44,10 +44,32 @@ try {
     tx.objectStore('audio').put(blob,'bass-tone-smoke');
     await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)});db.close();
   });
+  // Capture actual gain nodes created by Sonora when playback unlocks the mixer.
+  await page.addInitScript(()=>{
+    const original=AudioContext.prototype.createGain;
+    AudioContext.prototype.createGain=function(...args){
+      const node=original.apply(this,args);
+      (window.__sonoraTestGains??=[]).push(node);
+      return node;
+    };
+    const makeCompressor=AudioContext.prototype.createDynamicsCompressor;
+    AudioContext.prototype.createDynamicsCompressor=function(...args){
+      const node=makeCompressor.apply(this,args);
+      (window.__sonoraTestCompressors??=[]).push(node);
+      return node;
+    };
+  });
   await page.reload();
   await page.getByRole('button',{name:'All songs',exact:true}).click();
   await page.locator('.track-title').filter({hasText:'Synthetic bass playback test'}).click();
   await page.waitForFunction(()=>document.querySelector('.seekbar')?.innerText?.includes('0:01'),{timeout:10000});
+  await page.waitForFunction(()=>window.__sonoraTestGains?.some(node=>node.gain.value>2.2));
+  const measured=await page.evaluate(()=>({
+    maxMakeup:Math.max(...window.__sonoraTestGains.map(node=>node.gain.value)),
+    compressorRatios:window.__sonoraTestCompressors.map(node=>node.ratio.value)
+  }));
+  assert.ok(measured.maxMakeup>=2.3,`Makeup gain should restore loudness: ${measured.maxMakeup}`);
+  assert.ok(measured.compressorRatios.includes(16),'Keep the aggressive 16:1 bass compressor');
   assert.deepEqual(errors,[]);
-  console.log('PASS: Earthquake preset and +24 dB bass settings persist; synthetic 55 Hz audio plays through the full Web Audio graph.');
+  console.log('PASS: Earthquake +24 dB and 16:1 compression retained; real Web Audio mixer applies >2.3x makeup gain to restore loudness while synthetic 55 Hz audio plays.');
 } finally {await app.close();}
