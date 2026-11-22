@@ -32,21 +32,30 @@ export class AudioMixer {
       const ctx=new AudioContext();
       this.ctx=ctx;
       const low=ctx.createBiquadFilter(),sub=ctx.createBiquadFilter(),mid=ctx.createBiquadFilter(),high=ctx.createBiquadFilter();
-      low.type='lowshelf';low.frequency.value=160;
+      low.type='lowshelf';low.frequency.value=135;
       // Add controlled low-bass punch without excessively boosting the vocal range.
-      sub.type='peaking';sub.frequency.value=65;sub.Q.value=.85;
+      sub.type='peaking';sub.frequency.value=55;sub.Q.value=1.0;
       mid.type='peaking';mid.frequency.value=1000;mid.Q.value=.8;
       high.type='highshelf';high.frequency.value=4200;
       // Peak compression reduces overload risk at high positive EQ settings.
       const compressor=ctx.createDynamicsCompressor();
-      compressor.threshold.value=-4;compressor.knee.value=2;
-      compressor.ratio.value=12;compressor.attack.value=.003;compressor.release.value=.18;
+      compressor.threshold.value=-9;compressor.knee.value=3;
+      compressor.ratio.value=16;compressor.attack.value=.002;compressor.release.value=.2;
+      // The nonlinear soft-clipper adds perceived bass harmonics while bounding
+      // extreme peaks. Oversampling reduces distortion artifacts.
+      const saturator=ctx.createWaveShaper();
+      const curve=new Float32Array(4097);
+      for(let i=0;i<curve.length;i++){
+        const x=i/(curve.length-1)*2-1;
+        curve[i]=Math.tanh(1.7*x)/Math.tanh(1.7);
+      }
+      saturator.curve=curve;saturator.oversample='2x';
       // Flat/off EQ follows the uncompressed path; boosted EQ uses the protective compressor.
       const dry=ctx.createGain(),protectedGain=ctx.createGain();
       dry.gain.value=1;protectedGain.gain.value=0;
       low.connect(sub);sub.connect(mid);mid.connect(high);
       high.connect(dry);dry.connect(ctx.destination);
-      high.connect(compressor);compressor.connect(protectedGain);protectedGain.connect(ctx.destination);
+      high.connect(compressor);compressor.connect(saturator);saturator.connect(protectedGain);protectedGain.connect(ctx.destination);
       this.low=low;this.sub=sub;this.middle=mid;this.high=high;this.dry=dry;this.protectedGain=protectedGain;
       for(const deck of [this.first,this.second]){
         const source=ctx.createMediaElementSource(deck);
@@ -69,8 +78,9 @@ export class AudioMixer {
     const levels=this.eqEnabled?this.eq:{bass:0,mid:0,treble:0};
     const boosted=this.eqEnabled&&[levels.bass,levels.mid,levels.treble].some(value=>value>0);
     this.dry.gain.setTargetAtTime(boosted?0:1,t,.02);
-    this.protectedGain.gain.setTargetAtTime(boosted?1:0,t,.02);
-    for(const [node,gain] of [[this.low,levels.bass],[this.sub,Math.max(0,levels.bass)*.3],[this.middle,levels.mid],[this.high,levels.treble]] as const)
+    // Leave peak headroom after waveshaping; do not increase device volume.
+    this.protectedGain.gain.setTargetAtTime(boosted?.86:0,t,.02);
+    for(const [node,gain] of [[this.low,levels.bass],[this.sub,Math.max(0,levels.bass)*.42],[this.middle,levels.mid],[this.high,levels.treble]] as const)
       node.gain.setTargetAtTime(gain,t,.04);
   }
   setVolume(value:number,muted:boolean){
