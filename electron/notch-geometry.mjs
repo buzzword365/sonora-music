@@ -8,12 +8,15 @@ export function notchPopupBounds(display) {
   const center=display.bounds.x+display.bounds.width/2;
   return {x:Math.round(center-width/2),y:Math.round(top),width,height};
 }
-export function inNotchHoverZone(point,display) {
+export function inNotchHoverZone(point,display){
   if(!point||!display)return false;
   const middle=display.bounds.x+display.bounds.width/2;
-  const top=display.bounds.y;
-  const height=Math.max(32,display.workArea.y-top+6);
-  return Math.abs(point.x-middle)<=105 && point.y>=top && point.y<=top+height;
+  // Smaller opening hitbox (half of the former 240x72 region). The
+  // visible island and its expanded controls retain their original size.
+  // The physical top edge is intentionally not the initial trigger.
+  const menuBottom=Math.max(display.bounds.y+29,display.workArea.y);
+  return Math.abs(point.x-middle)<=60 &&
+    point.y>=menuBottom && point.y<=menuBottom+36;
 }
 export function inPopupZone(point,rect){
   return point.x>=rect.x-10 && point.x<=rect.x+rect.width+10 &&
